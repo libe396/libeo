@@ -67,7 +67,6 @@ function App() {
       {
         label: 'color palette',
         value: rules ? 'dominant colors from the image' : 'empty',
-        visualRule: 'Atmospheric Gradient',
         palette: rules?.palette || [],
       },
       {
@@ -75,27 +74,22 @@ function App() {
         value: rules
           ? `brightest remaining point ${Math.round(rules.lightOrigin.x * 100)} / ${Math.round(rules.lightOrigin.y * 100)}`
           : 'waiting',
-        visualRule: 'Sensory Origin',
       },
       {
         label: 'blur density',
         value: rules ? `soft diffusion level ${formatPercent(rules.blurDensity)}` : 'waiting',
-        visualRule: 'Soft Circle',
       },
       {
         label: 'motion trace',
         value: rules ? `directional drift ${rules.motionDirection.label}` : 'waiting',
-        visualRule: 'Faint Line',
       },
       {
         label: 'structure',
         value: rules ? `visual balance ${rules.structure?.dominantAxis || 'balanced'}, ${rules.structure?.shapeEnergy || 'soft'}` : 'waiting',
-        visualRule: 'Glow Intersection',
       },
       {
         label: 'memory field',
         value: rules ? `density and rhythm ${getMemoryFieldLabel(rules)}` : getMemoryFieldLabel(rules),
-        visualRule: 'Grain Texture / Memory Field',
       },
     ],
     [rules],
@@ -269,8 +263,6 @@ function App() {
             <span>source data for light translation</span>
           </div>
 
-          <p className="translation-note">Image data becomes visual rules, and visual rules become a light graphic.</p>
-
           <div className={`element-stack ${rules ? '' : 'is-empty'}`}>
             {rules ? (
               elementCards.map((item) => (
@@ -284,10 +276,6 @@ function App() {
                       ))}
                     </div>
                   ) : null}
-                  <div className="translation-row">
-                    <small>translated into</small>
-                    <b>{item.visualRule}</b>
-                  </div>
                 </article>
               ))
             ) : (

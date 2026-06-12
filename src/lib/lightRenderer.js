@@ -357,6 +357,22 @@ function createSoftCircles(rules, palette, colorWeights, origin, brightAnchors, 
       0.08 + random() * 0.14,
     );
 
+    const circleColor = getCirclePaletteColor(
+      mixColors(inheritedColor, featureColor, anchor.kind === 'bright' ? 0.36 : 0.2),
+      rules,
+      index,
+    );
+    const circleSecondaryColor = getCirclePaletteColor(
+      mixColors(palette[nextPaletteIndex], inheritedColor, 0.42),
+      rules,
+      index + 2,
+    );
+    const circleAccentColor = getCirclePaletteColor(
+      mixColors(palette[nextPaletteIndex], featureColor, anchor.kind === 'cluster' ? 0.28 : 0.18),
+      rules,
+      index + 5,
+    );
+
     circles.push({
       atmosphereAngle: angle + (random() - 0.5) * 1.2,
       cloudOffset: {
@@ -373,8 +389,8 @@ function createSoftCircles(rules, palette, colorWeights, origin, brightAnchors, 
           : hierarchy === 'medium'
             ? (5 + rules.blurDensity * 10 + random() * 7) * depth.blurScale
             : (3 + rules.blurDensity * 7 + random() * 5) * depth.blurScale,
-      accentColor: mixColors(palette[nextPaletteIndex], featureColor, anchor.kind === 'cluster' ? 0.28 : 0.18),
-      color: mixColors(inheritedColor, featureColor, anchor.kind === 'bright' ? 0.36 : 0.2),
+      accentColor: circleAccentColor,
+      color: circleColor,
       depth: depth.name,
       hierarchy,
       source: anchor.kind,
@@ -387,7 +403,7 @@ function createSoftCircles(rules, palette, colorWeights, origin, brightAnchors, 
           anchor.strength * 0.02) *
         depth.opacityScale,
       radius: radius * depth.radiusScale,
-      secondaryColor: mixColors(palette[nextPaletteIndex], inheritedColor, 0.42),
+      secondaryColor: circleSecondaryColor,
       x: clampToRange(x, -120, WIDTH + 120),
       y: clampToRange(y, -120, HEIGHT + 120),
     });
@@ -415,6 +431,7 @@ function paintSoftCircles(context, circles, rules) {
 
     // Foundation: readable memory-field silhouette.
     context.save();
+    context.globalCompositeOperation = 'source-over';
     context.filter = `blur(${Math.max(4, circle.blur * depthBlur * 0.58)}px)`;
     const silhouette = context.createRadialGradient(
       circle.x,
@@ -424,9 +441,9 @@ function paintSoftCircles(context, circles, rules) {
       circle.y,
       circle.radius * 1.02,
     );
-    silhouette.addColorStop(0, withAlpha(mixColors(circle.color, secondaryColor, 0.16), circle.opacity * 0.3 * depthOpacity));
-    silhouette.addColorStop(0.5, withAlpha(circle.color, circle.opacity * 0.44 * depthOpacity));
-    silhouette.addColorStop(0.78, withAlpha(mixColors(circle.color, accentColor, 0.2), circle.opacity * 0.2 * depthOpacity));
+    silhouette.addColorStop(0, withAlpha(mixColors(circle.color, secondaryColor, 0.18), circle.opacity * 0.34 * depthOpacity));
+    silhouette.addColorStop(0.5, withAlpha(circle.color, circle.opacity * 0.5 * depthOpacity));
+    silhouette.addColorStop(0.78, withAlpha(mixColors(circle.color, accentColor, 0.22), circle.opacity * 0.24 * depthOpacity));
     silhouette.addColorStop(1, withAlpha(mixColors(circle.color, secondaryColor, 0.18), 0));
     context.fillStyle = silhouette;
     context.beginPath();
@@ -445,9 +462,9 @@ function paintSoftCircles(context, circles, rules) {
       circle.y,
       circle.radius * 1.08,
     );
-    diffuse.addColorStop(0, withAlpha(mixColors(circle.color, highlightColor, 0.14), circle.opacity * 0.46 * depthOpacity));
-    diffuse.addColorStop(0.38, withAlpha(mixColors(circle.color, secondaryColor, 0.18), circle.opacity * 0.72 * depthOpacity));
-    diffuse.addColorStop(0.68, withAlpha(mixColors(circle.color, accentColor, 0.16), circle.opacity * 0.32 * depthOpacity));
+    diffuse.addColorStop(0, withAlpha(mixColors(circle.color, highlightColor, 0.045), circle.opacity * 0.46 * depthOpacity));
+    diffuse.addColorStop(0.38, withAlpha(mixColors(circle.color, secondaryColor, 0.24), circle.opacity * 0.76 * depthOpacity));
+    diffuse.addColorStop(0.68, withAlpha(mixColors(circle.color, accentColor, 0.24), circle.opacity * 0.38 * depthOpacity));
     diffuse.addColorStop(1, withAlpha(circle.color, 0));
     context.fillStyle = diffuse;
     context.beginPath();
@@ -460,9 +477,9 @@ function paintSoftCircles(context, circles, rules) {
     context.globalCompositeOperation = 'screen';
     context.filter = `blur(${Math.max(4, circle.blur * 0.72)}px)`;
     const cloud = context.createRadialGradient(cloudX, cloudY, circle.radius * 0.04, cloudX, cloudY, circle.radius * 0.72);
-    cloud.addColorStop(0, withAlpha(mixColors(pooledColor, highlightColor, 0.08), circle.opacity * 0.5 * depthOpacity));
-    cloud.addColorStop(0.4, withAlpha(secondaryColor, circle.opacity * 0.42 * depthOpacity));
-    cloud.addColorStop(0.72, withAlpha(mixColors(secondaryColor, accentColor, 0.38), circle.opacity * 0.14 * depthOpacity));
+    cloud.addColorStop(0, withAlpha(mixColors(pooledColor, highlightColor, 0.035), circle.opacity * 0.54 * depthOpacity));
+    cloud.addColorStop(0.4, withAlpha(secondaryColor, circle.opacity * 0.48 * depthOpacity));
+    cloud.addColorStop(0.72, withAlpha(mixColors(secondaryColor, accentColor, 0.46), circle.opacity * 0.18 * depthOpacity));
     cloud.addColorStop(1, withAlpha(pooledColor, 0));
     context.fillStyle = cloud;
     context.beginPath();
@@ -475,8 +492,8 @@ function paintSoftCircles(context, circles, rules) {
     context.globalCompositeOperation = 'screen';
     context.filter = `blur(${Math.max(2.4, circle.blur * 0.36)}px)`;
     const core = context.createRadialGradient(coreX, coreY, 0, coreX, coreY, circle.radius * 0.34);
-    core.addColorStop(0, withAlpha(mixColors(accentColor, highlightColor, 0.16), circle.opacity * 0.32 * depthOpacity));
-    core.addColorStop(0.48, withAlpha(mixColors(pooledColor, circle.color, 0.26), circle.opacity * 0.2 * depthOpacity));
+    core.addColorStop(0, withAlpha(mixColors(accentColor, highlightColor, 0.06), circle.opacity * 0.34 * depthOpacity));
+    core.addColorStop(0.48, withAlpha(mixColors(pooledColor, circle.color, 0.32), circle.opacity * 0.24 * depthOpacity));
     core.addColorStop(1, withAlpha(pooledColor, 0));
     context.fillStyle = core;
     context.beginPath();
@@ -541,9 +558,9 @@ function paintSoftCircles(context, circles, rules) {
       const overlapAccent = mixColors(circle.accentColor || circle.color, other.secondaryColor || other.color, 0.5);
       const pooledColor = mixColors(color, overlapAccent, 0.3);
       const overlapHighlight = getPaletteHighlightColor(color, overlapAccent, pooledColor, rules);
-      overlapGlow.addColorStop(0, withAlpha(mixColors(pooledColor, overlapHighlight, 0.12), 0.065 + strength * 0.05 + (circle.opacity + other.opacity) * 0.24));
-      overlapGlow.addColorStop(0.42, withAlpha(pooledColor, 0.048 + strength * 0.04 + (circle.opacity + other.opacity) * 0.13));
-      overlapGlow.addColorStop(0.72, withAlpha(color, 0.018 + strength * 0.026));
+      overlapGlow.addColorStop(0, withAlpha(mixColors(pooledColor, overlapHighlight, 0.055), 0.07 + strength * 0.052 + (circle.opacity + other.opacity) * 0.26));
+      overlapGlow.addColorStop(0.42, withAlpha(pooledColor, 0.056 + strength * 0.044 + (circle.opacity + other.opacity) * 0.15));
+      overlapGlow.addColorStop(0.72, withAlpha(color, 0.024 + strength * 0.03));
       overlapGlow.addColorStop(1, withAlpha(color, 0));
       context.fillStyle = overlapGlow;
       context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
@@ -1706,6 +1723,23 @@ function getCircleShadowColor(color, rules) {
     h: hsl.h,
     s: clampToRange(hsl.s * 0.48, 0.08, 0.22),
     l: rules.averageBrightness < 0.28 ? 0.16 : 0.28,
+  });
+}
+
+function getCirclePaletteColor(color, rules, salt = 0) {
+  const hsl = rgbToHsl(hexToRgb(color));
+  const isLightNeutral = hsl.l > 0.76 && hsl.s < 0.16;
+  const saturationBoost = rules.averageBrightness > 0.72 ? 1.18 : 1.34;
+  const hueShift = salt % 3 === 0 ? 0 : salt % 3 === 1 ? 5 : -6;
+
+  return hslToHex({
+    h: (hsl.h + hueShift + 360) % 360,
+    s: isLightNeutral
+      ? clampToRange(hsl.s + 0.055, 0.08, 0.24)
+      : clampToRange(hsl.s * saturationBoost + 0.035, 0.18, 0.68),
+    l: isLightNeutral
+      ? clampToRange(hsl.l - 0.08, 0.62, 0.78)
+      : clampToRange(hsl.l - 0.035, rules.averageBrightness < 0.3 ? 0.32 : 0.38, 0.68),
   });
 }
 
