@@ -630,11 +630,11 @@ function createFaintLines(rules, palette, colorWeights, origin, circles, seconda
   const perpendicular = motion + Math.PI / 2;
   const lineCount = clampToRange(
     Math.round(
-      (4.2 + structure.repetition * 0.9 + structure.geometricRhythm * 0.85 + memoryField.density * 2.2) *
+      (2.7 + structure.repetition * 0.42 + structure.geometricRhythm * 0.38 + memoryField.density * 0.9) *
         profile.lineMultiplier,
     ),
-    4,
-    9,
+    3,
+    6,
   );
   const structureCenter = {
     x: mixNumber(origin.x, structure.balance.x * WIDTH, 0.56),
@@ -677,26 +677,26 @@ function createFaintLines(rules, palette, colorWeights, origin, circles, seconda
     );
     const extendedStart = extendPoint(start, end, -distance * extension);
     const extendedEnd = extendPoint(end, start, -distance * extension);
-    const drift = (random() - 0.5) * distance * (0.2 + memoryField.rhythm * 0.06);
+    const drift = (random() - 0.5) * distance * (0.035 + memoryField.rhythm * 0.018);
     const controlA = {
       x:
         mixNumber(extendedStart.x, midpoint.x, 0.56) +
         Math.cos(pathInfluence + Math.PI / 2) * (curvature * 0.58 + drift) +
-        Math.cos(perpendicular) * (random() - 0.5) * 68,
+        Math.cos(perpendicular) * (random() - 0.5) * 14,
       y:
         mixNumber(extendedStart.y, midpoint.y, 0.56) +
         Math.sin(pathInfluence + Math.PI / 2) * (curvature * 0.58 + drift) +
-        Math.sin(perpendicular) * (random() - 0.5) * 68,
+        Math.sin(perpendicular) * (random() - 0.5) * 14,
     };
     const controlB = {
       x:
         mixNumber(extendedEnd.x, midpoint.x, 0.56) -
         Math.cos(pathInfluence + Math.PI / 2) * (curvature * 0.46 - drift) +
-        Math.cos(perpendicular) * (random() - 0.5) * 74,
+        Math.cos(perpendicular) * (random() - 0.5) * 16,
       y:
         mixNumber(extendedEnd.y, midpoint.y, 0.56) -
         Math.sin(pathInfluence + Math.PI / 2) * (curvature * 0.46 - drift) +
-        Math.sin(perpendicular) * (random() - 0.5) * 74,
+        Math.sin(perpendicular) * (random() - 0.5) * 16,
     };
     const paletteIndex = weightedPaletteIndex(colorWeights, index / Math.max(1, lineCount - 1), index + 13);
     const localLineColor = mixColors(
@@ -714,9 +714,9 @@ function createFaintLines(rules, palette, colorWeights, origin, circles, seconda
       ),
       opacity: (index < 3 ? 0.28 : 0.17) + random() * 0.07 + memoryField.density * 0.035,
       points: softenPath(
-        sampleCubic(extendedStart, controlA, controlB, extendedEnd, 88),
+        sampleCubic(extendedStart, controlA, controlB, extendedEnd, 96),
         random,
-        7 + rules.blurDensity * 8 + memoryField.rhythm * 6,
+        1.2 + rules.blurDensity * 1.8 + memoryField.rhythm * 1.4,
       ),
       role: index < 3 ? 'primary' : 'secondary',
       purpose: `${start.kind || 'memory'} to ${end.kind || 'memory'}`,
@@ -1173,50 +1173,60 @@ function sampleCubic(start, controlA, controlB, end, steps) {
 function softenPath(points, random, drift) {
   if (points.length < 4) return points;
 
-  return points.map((point, index) => {
+  const phase = random() * Math.PI * 2;
+  const secondaryPhase = random() * Math.PI * 2;
+  const amplitude = drift * (0.72 + random() * 0.28);
+  const softlyDrifted = points.map((point, index) => {
     const t = index / (points.length - 1);
     const fade = Math.sin(Math.PI * t);
     const previous = points[Math.max(0, index - 1)];
     const next = points[Math.min(points.length - 1, index + 1)];
     const angle = Math.atan2(next.y - previous.y, next.x - previous.x) + Math.PI / 2;
-    const wave = Math.sin(t * Math.PI * 2.2 + random() * 0.7) * drift * 0.34;
-    const breathing = (random() - 0.5) * drift * 0.42;
-    const offset = (wave + breathing) * fade;
+    const longWave = Math.sin(t * Math.PI * 1.35 + phase) * amplitude * 0.46;
+    const slowBreath = Math.sin(t * Math.PI * 2.1 + secondaryPhase) * amplitude * 0.18;
+    const offset = (longWave + slowBreath) * fade;
 
     return {
       x: point.x + Math.cos(angle) * offset,
       y: point.y + Math.sin(angle) * offset,
     };
   });
+
+  return smoothPoints(smoothPoints(softlyDrifted));
 }
 
-function strokeSampledLine(context, points) {
-  if (!points.length) return;
+function smoothPoints(points) {
+  if (points.length < 5) return points;
 
-  context.beginPath();
-  context.moveTo(points[0].x, points[0].y);
-  for (let index = 1; index < points.length; index += 1) {
-    context.lineTo(points[index].x, points[index].y);
-  }
-  context.stroke();
+  return points.map((point, index) => {
+    if (index === 0 || index === points.length - 1) return point;
+
+    const previous = points[index - 1];
+    const next = points[index + 1];
+    return {
+      x: point.x * 0.5 + previous.x * 0.25 + next.x * 0.25,
+      y: point.y * 0.5 + previous.y * 0.25 + next.y * 0.25,
+    };
+  });
 }
 
 function strokeFadedLine(context, points, color, opacity) {
-  if (points.length < 2) return;
+  if (points.length < 3) return;
 
-  for (let index = 1; index < points.length; index += 1) {
+  for (let index = 2; index < points.length; index += 2) {
     const t = index / (points.length - 1);
     const fade = Math.sin(Math.PI * t);
-    const previous = points[index - 1];
+    const previous = points[index - 2];
+    const control = points[index - 1];
     const current = points[index];
 
     if (fade < 0.02) continue;
 
-    const residue = 0.82 + Math.sin(t * Math.PI * 5.2) * 0.12 + Math.sin(t * Math.PI * 9.1) * 0.06;
-    context.strokeStyle = withAlpha(color, opacity * Math.pow(fade, 1.58) * residue);
+    const residue = 0.94 + Math.sin(t * Math.PI * 1.6) * 0.035;
+    context.strokeStyle = withAlpha(color, opacity * Math.pow(fade, 1.82) * residue);
     context.beginPath();
     context.moveTo(previous.x, previous.y);
-    context.lineTo(current.x, current.y);
+    context.quadraticCurveTo(control.x, control.y, current.x, current.y);
     context.stroke();
   }
 }
