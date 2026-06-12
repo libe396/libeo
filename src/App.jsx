@@ -66,30 +66,36 @@ function App() {
     () => [
       {
         label: 'color palette',
-        value: rules ? 'atmosphere translated' : 'empty',
+        value: rules ? 'dominant colors from the image' : 'empty',
+        visualRule: 'Atmospheric Gradient',
         palette: rules?.palette || [],
       },
       {
-        label: 'most intense light point',
+        label: 'light origin',
         value: rules
-          ? `${Math.round(rules.lightOrigin.x * 100)} / ${Math.round(rules.lightOrigin.y * 100)}`
+          ? `brightest remaining point ${Math.round(rules.lightOrigin.x * 100)} / ${Math.round(rules.lightOrigin.y * 100)}`
           : 'waiting',
+        visualRule: 'Sensory Origin',
       },
       {
-        label: 'soft blur density',
-        value: rules ? formatPercent(rules.blurDensity) : 'waiting',
+        label: 'blur density',
+        value: rules ? `soft diffusion level ${formatPercent(rules.blurDensity)}` : 'waiting',
+        visualRule: 'Soft Circle',
       },
       {
         label: 'motion trace',
-        value: rules ? rules.motionDirection.label : 'waiting',
+        value: rules ? `directional drift ${rules.motionDirection.label}` : 'waiting',
+        visualRule: 'Faint Line',
       },
       {
         label: 'structure',
-        value: rules ? `${rules.structure?.dominantAxis || 'balanced'}, ${rules.structure?.shapeEnergy || 'soft'}` : 'waiting',
+        value: rules ? `visual balance ${rules.structure?.dominantAxis || 'balanced'}, ${rules.structure?.shapeEnergy || 'soft'}` : 'waiting',
+        visualRule: 'Glow Intersection',
       },
       {
         label: 'memory field',
-        value: getMemoryFieldLabel(rules),
+        value: rules ? `density and rhythm ${getMemoryFieldLabel(rules)}` : getMemoryFieldLabel(rules),
+        visualRule: 'Grain Texture / Memory Field',
       },
     ],
     [rules],
@@ -169,7 +175,7 @@ function App() {
           </a>
           <span>{statusCopy}</span>
         </nav>
-        <h1 id="workspace-title">Archive Workspace System</h1>
+        <h1 id="workspace-title">Light Translation Archive</h1>
         <p className="archive-subtitle">from blurred image fragments to personal light graphics</p>
       </header>
 
@@ -238,7 +244,7 @@ function App() {
             <figure className="memory-card generated-card">
               <figcaption>
                 <span>After</span>
-                <small>Generated Light Graphic</small>
+                <small>Generated Light Translation</small>
               </figcaption>
               {canShowGraphic ? (
                 <canvas
@@ -257,30 +263,35 @@ function App() {
 
         </section>
 
-        <aside className="archive-panel elements-panel" aria-label="extracted elements">
+        <aside className="archive-panel elements-panel" aria-label="image analysis">
           <div className="panel-title">
-            <p>Extracted Elements</p>
-            <span>Rule System</span>
+            <p>Image Analysis</p>
+            <span>source data for light translation</span>
           </div>
+
+          <p className="translation-note">Image data becomes visual rules, and visual rules become a light graphic.</p>
 
           <div className={`element-stack ${rules ? '' : 'is-empty'}`}>
             {rules ? (
               elementCards.map((item) => (
                 <article className="element-card" key={item.label}>
                   <span>{item.label}</span>
+                  <strong>{item.value}</strong>
                   {item.palette?.length ? (
                     <div className="mini-palette">
                       {item.palette.map((color) => (
                         <i key={color} style={{ background: color }} />
                       ))}
                     </div>
-                  ) : (
-                    <strong>{item.value}</strong>
-                  )}
+                  ) : null}
+                  <div className="translation-row">
+                    <small>translated into</small>
+                    <b>{item.visualRule}</b>
+                  </div>
                 </article>
               ))
             ) : (
-              <div className="elements-empty">extracted elements wait here</div>
+              <div className="elements-empty">image analysis waits here</div>
             )}
           </div>
 
