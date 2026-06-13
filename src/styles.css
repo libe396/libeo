@@ -75,11 +75,16 @@ button:disabled {
 }
 
 .wordmark {
-  color: #242321;
-  font-size: clamp(1.1rem, 1.6vw, 1.45rem);
-  font-weight: 400;
-  letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
   text-decoration: none;
+}
+
+.wordmark img {
+  display: block;
+  width: auto;
+  height: 28px;
+  object-fit: contain;
 }
 
 .archive-nav span {
@@ -446,6 +451,10 @@ h1 {
 
   .archive-nav {
     margin-bottom: 3rem;
+  }
+
+  .wordmark img {
+    height: 24px;
   }
 
   .flow-annotations,

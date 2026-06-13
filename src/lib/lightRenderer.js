@@ -358,7 +358,7 @@ function createSoftCircles(rules, palette, colorWeights, origin, brightAnchors, 
     );
 
     const circleColor = getCirclePaletteColor(
-      mixColors(inheritedColor, featureColor, anchor.kind === 'bright' ? 0.36 : 0.2),
+      mixColors(inheritedColor, featureColor, anchor.kind === 'bright' ? 0.60 : 0.46),
       rules,
       index,
     );
@@ -368,7 +368,7 @@ function createSoftCircles(rules, palette, colorWeights, origin, brightAnchors, 
       index + 2,
     );
     const circleAccentColor = getCirclePaletteColor(
-      mixColors(palette[nextPaletteIndex], featureColor, anchor.kind === 'cluster' ? 0.28 : 0.18),
+      mixColors(palette[nextPaletteIndex], featureColor, anchor.kind === 'cluster' ? 0.46 : 0.36),
       rules,
       index + 5,
     );
@@ -395,7 +395,7 @@ function createSoftCircles(rules, palette, colorWeights, origin, brightAnchors, 
       hierarchy,
       source: anchor.kind,
       opacity:
-        ((hierarchy === 'large' ? 0.128 : hierarchy === 'medium' ? 0.116 : 0.09) +
+        ((hierarchy === 'large' ? 0.25 : hierarchy === 'medium' ? 0.20 : 0.14) +
           dominanceBoost * 0.084 +
           densityBoost +
           memoryField.density * 0.018 +
@@ -731,13 +731,13 @@ function createFaintLines(rules, palette, colorWeights, origin, circles, seconda
     );
 
     lines.push({
-      blur: 0.12 + rules.blurDensity * 0.42 + random() * 0.28,
+      blur: 1.8 + rules.blurDensity * 5.5 + random() * 2,
       color: mixColors(
         mixColors(localLineColor, palette[(paletteIndex + 1) % palette.length], 0.24 + random() * 0.18),
         '#ffffff',
-        0.24,
+        0.12,
       ),
-      opacity: (index < 3 ? 0.28 : 0.17) + random() * 0.07 + memoryField.density * 0.035,
+      opacity: (index < 3 ? 0.16 : 0.09) + random() * 0.04 + memoryField.density * 0.02,
       points: softenPath(
         sampleCubic(extendedStart, controlA, controlB, extendedEnd, 96),
         random,
@@ -745,7 +745,7 @@ function createFaintLines(rules, palette, colorWeights, origin, circles, seconda
       ),
       role: index < 3 ? 'primary' : 'secondary',
       purpose: `${start.kind || 'memory'} to ${end.kind || 'memory'}`,
-      width: (index < 3 ? 1.36 : 0.84) + random() * 0.48,
+      width: (index < 3 ? 0.68 : 0.42) + random() * 0.22,
     });
   }
 
@@ -771,13 +771,6 @@ function paintFaintLines(context, lines, rules) {
     strokeFadedLine(context, line.points, line.color, line.opacity * (line.role === 'primary' ? 1.48 : index % 4 === 0 ? 1.14 : 0.98));
     context.restore();
 
-    if (line.role === 'primary') {
-      context.save();
-      context.filter = `blur(${Math.max(0.1, line.blur * 0.38)}px)`;
-      context.lineWidth = Math.max(0.76, line.width * 0.48);
-      strokeFadedLine(context, line.points, mixColors(line.color, '#ffffff', 0.36), line.opacity * 0.72);
-      context.restore();
-    }
   });
 
   context.restore();
@@ -1307,9 +1300,11 @@ function selectLineAnchors(circles, secondaryLights, structureAnchors, memoryFie
 
 function pickRelationshipStart(anchors, index) {
   if (index === 0) return anchors[0];
-  if (index % 3 === 0) return anchors.find((anchor) => anchor.kind === 'secondary') || anchors[0];
-  if (index % 3 === 1) return anchors.find((anchor) => anchor.kind === 'structure') || anchors[(index % Math.max(1, anchors.length - 1)) + 1];
-  return anchors[(index % Math.max(1, anchors.length - 1)) + 1] || anchors[0];
+  const nonOrigin = anchors.filter((anchor) => anchor.kind !== 'origin');
+  const fallback = nonOrigin[0] || anchors[0];
+  if (index % 3 === 0) return nonOrigin.find((anchor) => anchor.kind === 'secondary') || fallback;
+  if (index % 3 === 1) return nonOrigin.find((anchor) => anchor.kind === 'structure') || nonOrigin[(index % Math.max(1, nonOrigin.length - 1)) + 1] || fallback;
+  return nonOrigin[(index % Math.max(1, nonOrigin.length - 1)) + 1] || fallback;
 }
 
 function pickRelationshipEnd(anchors, start, index) {

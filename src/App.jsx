@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import wordmark from './assets/libeo-wordmark.png';
 import { analyzeImage } from './lib/imageAnalysis.js';
 import { renderLightGraphic } from './lib/lightRenderer.js';
 
@@ -165,7 +166,7 @@ function App() {
       <header className="archive-hero" aria-labelledby="workspace-title">
         <nav className="archive-nav">
           <a className="wordmark" href="/" aria-label="libeo home">
-            libeo
+            <img src={wordmark} alt="LIBEO" />
           </a>
           <span>{statusCopy}</span>
         </nav>
