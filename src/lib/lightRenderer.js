@@ -69,15 +69,30 @@ function paintCanvas(context, palette, colorWeights, rules, origin) {
     const rgb = hexToRgb(hex);
     r += rgb[0] * w; g += rgb[1] * w; b += rgb[2] * w; totalW += w;
   });
-  r = Math.round(r / totalW * 0.85);
-  g = Math.round(g / totalW * 0.85);
-  b = Math.round(b / totalW * 0.85);
+  r = Math.round(r / totalW * 1.2);
+  g = Math.round(g / totalW * 1.2);
+  b = Math.round(b / totalW * 1.2);
   console.log('[BG] final bgColor:', `rgb(${r},${g},${b})`);
 
   // Paint palette-tinted base, then dark overlay on top.
   context.fillStyle = `rgb(${r},${g},${b})`;
   context.fillRect(0, 0, WIDTH, HEIGHT);
-  context.fillStyle = 'rgba(8,8,16,0.42)';
+  context.fillStyle = 'rgba(8,8,16,0.35)';
+  context.fillRect(0, 0, WIDTH, HEIGHT);
+
+  // Dominant palette color radial glow from light origin.
+  const dominantHex = palette[0];
+  const [dr, dg, db] = hexToRgb(dominantHex);
+  const radGrad = context.createRadialGradient(
+    WIDTH * rules.lightOrigin.x,
+    HEIGHT * rules.lightOrigin.y,
+    0,
+    WIDTH * 0.5, HEIGHT * 0.5,
+    WIDTH * 0.8,
+  );
+  radGrad.addColorStop(0, `rgba(${dr},${dg},${db},0.25)`);
+  radGrad.addColorStop(1, `rgba(${dr},${dg},${db},0)`);
+  context.fillStyle = radGrad;
   context.fillRect(0, 0, WIDTH, HEIGHT);
 
   context.save();

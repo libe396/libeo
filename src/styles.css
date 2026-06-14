@@ -37,7 +37,7 @@ input {
 #ink-bg {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   display: block;
   pointer-events: none;
 }
@@ -76,7 +76,7 @@ input {
 
 .wordmark-img {
   display: block;
-  height: 40px;
+  height: 24px;
   width: auto;
   object-fit: contain;
   filter: invert(1) opacity(0.42);
@@ -92,13 +92,12 @@ input {
 /* ─── Bottom bar ─────────────────────────────────────────────────────────────── */
 
 .bottom-bar {
-  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   z-index: 20;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   padding: 20px 36px;
   pointer-events: none;
@@ -156,6 +155,8 @@ input {
 /* ─── Phase: idle ────────────────────────────────────────────────────────────── */
 
 .idle-content {
+  position: relative;
+  z-index: 5;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -203,8 +204,8 @@ input {
 /* ─── Phase: uploaded ────────────────────────────────────────────────────────── */
 
 .preview-portrait {
-  width: 240px;
-  height: 300px;
+  width: 200px;
+  height: 200px;
   border-radius: 18px;
   object-fit: cover;
   border: 0.5px solid rgba(255, 255, 255, 0.1);
@@ -405,8 +406,8 @@ input {
 }
 
 .compare-img {
-  width: 400px !important;
-  height: 400px !important;
+  width: 200px !important;
+  height: 200px !important;
   border-radius: 8px;
   display: block;
   object-fit: cover;
