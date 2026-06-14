@@ -55,25 +55,29 @@ function createRuleField(rules, palette, colorWeights, origin, seed) {
 }
 
 function paintCanvas(context, palette, colorWeights, rules, origin) {
+  console.log('[BG] palette:', palette, 'colorWeights:', colorWeights);
   const motion = ((rules.motionDirection.angle || 0) * Math.PI) / 180;
   const atmosphericDark = getAtmosphericDark(palette, rules);
   const colorStops = getProportionalColorStops(palette, colorWeights);
   const dominant = colorStops[0]?.color || palette[0];
   const lastColor = colorStops[colorStops.length - 1]?.color || palette[palette.length - 1];
-  const gradient = context.createLinearGradient(
-    CENTER.x - Math.cos(motion) * WIDTH * 0.7,
-    CENTER.y - Math.sin(motion) * HEIGHT * 0.7,
-    CENTER.x + Math.cos(motion) * WIDTH * 0.7,
-    CENTER.y + Math.sin(motion) * HEIGHT * 0.7,
-  );
 
-  gradient.addColorStop(0, mixColors(atmosphericDark, dominant, rules.averageBrightness < 0.34 ? 0.54 : 0.72));
-  colorStops.forEach((stop) => {
-    gradient.addColorStop(stop.position, stop.color);
+  // Weighted average of palette colors scaled to 18% — gives a dark but hue-correct base.
+  let r = 0, g = 0, b = 0, totalW = 0;
+  palette.forEach((hex, i) => {
+    const w = colorWeights[i] || 1;
+    const rgb = hexToRgb(hex);
+    r += rgb[0] * w; g += rgb[1] * w; b += rgb[2] * w; totalW += w;
   });
-  gradient.addColorStop(1, mixColors(atmosphericDark, lastColor, rules.averageBrightness < 0.34 ? 0.48 : 0.66));
+  r = Math.round(r / totalW * 0.85);
+  g = Math.round(g / totalW * 0.85);
+  b = Math.round(b / totalW * 0.85);
+  console.log('[BG] final bgColor:', `rgb(${r},${g},${b})`);
 
-  context.fillStyle = gradient;
+  // Paint palette-tinted base, then dark overlay on top.
+  context.fillStyle = `rgb(${r},${g},${b})`;
+  context.fillRect(0, 0, WIDTH, HEIGHT);
+  context.fillStyle = 'rgba(8,8,16,0.42)';
   context.fillRect(0, 0, WIDTH, HEIGHT);
 
   context.save();
@@ -81,8 +85,8 @@ function paintCanvas(context, palette, colorWeights, rules, origin) {
   const vignette = context.createRadialGradient(origin.x, origin.y, 80, CENTER.x, CENTER.y, 720);
   vignette.addColorStop(0, 'rgba(255,255,255,0)');
   vignette.addColorStop(0.5, withAlpha(atmosphericDark, 0.02));
-  vignette.addColorStop(0.78, withAlpha(atmosphericDark, rules.averageBrightness < 0.35 ? 0.22 : 0.12));
-  vignette.addColorStop(1, withAlpha(atmosphericDark, rules.averageBrightness < 0.35 ? 0.46 : 0.24));
+  vignette.addColorStop(0.78, withAlpha(atmosphericDark, rules.averageBrightness < 0.35 ? 0.38 : 0.22));
+  vignette.addColorStop(1, withAlpha(atmosphericDark, rules.averageBrightness < 0.35 ? 0.64 : 0.38));
   context.fillStyle = vignette;
   context.fillRect(0, 0, WIDTH, HEIGHT);
   context.restore();
@@ -358,7 +362,7 @@ function createSoftCircles(rules, palette, colorWeights, origin, brightAnchors, 
     );
 
     const circleColor = getCirclePaletteColor(
-      mixColors(inheritedColor, featureColor, anchor.kind === 'bright' ? 0.60 : 0.46),
+      mixColors(inheritedColor, featureColor, anchor.kind === 'bright' ? 0.70 : 0.46),
       rules,
       index,
     );
@@ -428,6 +432,25 @@ function paintSoftCircles(context, circles, rules) {
     const accentColor = circle.accentColor || getCircleShiftColor(secondaryColor, index + 3);
     const pooledColor = mixColors(secondaryColor, accentColor, 0.28);
     const highlightColor = getPaletteHighlightColor(circle.color, secondaryColor, accentColor, rules);
+    const bodyCenterOpacity = clampToRange(0.55 + (index % 3) * 0.075, 0.55, 0.70) * depthOpacity;
+
+    // Body: deep, saturated fill — four-stop gradient for strong center presence.
+    context.save();
+    context.globalCompositeOperation = 'source-over';
+    context.filter = 'blur(0.5px)';
+    const body = context.createRadialGradient(
+      circle.x, circle.y, 0,
+      circle.x, circle.y, circle.radius * 0.92,
+    );
+    body.addColorStop(0, withAlpha(circle.color, bodyCenterOpacity));
+    body.addColorStop(0.3, withAlpha(circle.color, 0.4 * depthOpacity));
+    body.addColorStop(0.6, withAlpha(circle.color, 0.15 * depthOpacity));
+    body.addColorStop(1.0, withAlpha(circle.color, 0));
+    context.fillStyle = body;
+    context.beginPath();
+    context.ellipse(circle.x, circle.y, circle.radius * 0.92, circle.radius * 0.78, circle.atmosphereAngle, 0, Math.PI * 2);
+    context.fill();
+    context.restore();
 
     // Foundation: readable memory-field silhouette.
     context.save();
@@ -462,9 +485,9 @@ function paintSoftCircles(context, circles, rules) {
       circle.y,
       circle.radius * 1.08,
     );
-    diffuse.addColorStop(0, withAlpha(mixColors(circle.color, highlightColor, 0.045), circle.opacity * 0.46 * depthOpacity));
-    diffuse.addColorStop(0.38, withAlpha(mixColors(circle.color, secondaryColor, 0.24), circle.opacity * 0.76 * depthOpacity));
-    diffuse.addColorStop(0.68, withAlpha(mixColors(circle.color, accentColor, 0.24), circle.opacity * 0.38 * depthOpacity));
+    diffuse.addColorStop(0, withAlpha(mixColors(circle.color, highlightColor, 0.045), circle.opacity * 0.64 * depthOpacity));
+    diffuse.addColorStop(0.38, withAlpha(mixColors(circle.color, secondaryColor, 0.24), circle.opacity * 1.06 * depthOpacity));
+    diffuse.addColorStop(0.68, withAlpha(mixColors(circle.color, accentColor, 0.24), circle.opacity * 0.53 * depthOpacity));
     diffuse.addColorStop(1, withAlpha(circle.color, 0));
     context.fillStyle = diffuse;
     context.beginPath();
@@ -477,9 +500,9 @@ function paintSoftCircles(context, circles, rules) {
     context.globalCompositeOperation = 'screen';
     context.filter = `blur(${Math.max(4, circle.blur * 0.72)}px)`;
     const cloud = context.createRadialGradient(cloudX, cloudY, circle.radius * 0.04, cloudX, cloudY, circle.radius * 0.72);
-    cloud.addColorStop(0, withAlpha(mixColors(pooledColor, highlightColor, 0.035), circle.opacity * 0.54 * depthOpacity));
-    cloud.addColorStop(0.4, withAlpha(secondaryColor, circle.opacity * 0.48 * depthOpacity));
-    cloud.addColorStop(0.72, withAlpha(mixColors(secondaryColor, accentColor, 0.46), circle.opacity * 0.18 * depthOpacity));
+    cloud.addColorStop(0, withAlpha(mixColors(pooledColor, highlightColor, 0.035), circle.opacity * 0.76 * depthOpacity));
+    cloud.addColorStop(0.4, withAlpha(secondaryColor, circle.opacity * 0.67 * depthOpacity));
+    cloud.addColorStop(0.72, withAlpha(mixColors(secondaryColor, accentColor, 0.46), circle.opacity * 0.25 * depthOpacity));
     cloud.addColorStop(1, withAlpha(pooledColor, 0));
     context.fillStyle = cloud;
     context.beginPath();
@@ -492,8 +515,8 @@ function paintSoftCircles(context, circles, rules) {
     context.globalCompositeOperation = 'screen';
     context.filter = `blur(${Math.max(2.4, circle.blur * 0.36)}px)`;
     const core = context.createRadialGradient(coreX, coreY, 0, coreX, coreY, circle.radius * 0.34);
-    core.addColorStop(0, withAlpha(mixColors(accentColor, highlightColor, 0.06), circle.opacity * 0.34 * depthOpacity));
-    core.addColorStop(0.48, withAlpha(mixColors(pooledColor, circle.color, 0.32), circle.opacity * 0.24 * depthOpacity));
+    core.addColorStop(0, withAlpha(mixColors(accentColor, highlightColor, 0.06), circle.opacity * 0.48 * depthOpacity));
+    core.addColorStop(0.48, withAlpha(mixColors(pooledColor, circle.color, 0.32), circle.opacity * 0.34 * depthOpacity));
     core.addColorStop(1, withAlpha(pooledColor, 0));
     context.fillStyle = core;
     context.beginPath();
@@ -507,9 +530,9 @@ function paintSoftCircles(context, circles, rules) {
     context.filter = `blur(${Math.max(4.5, circle.blur * 0.56)}px)`;
     const edge = context.createRadialGradient(circle.x, circle.y, circle.radius * 0.48, circle.x, circle.y, circle.radius * 1.02);
     edge.addColorStop(0, withAlpha(circle.color, 0));
-    edge.addColorStop(0.5, withAlpha(mixColors(circle.color, secondaryColor, 0.24), circle.opacity * 0.15 * depthOpacity));
-    edge.addColorStop(0.68, withAlpha(pooledColor, circle.opacity * 0.18 * depthOpacity));
-    edge.addColorStop(0.84, withAlpha(mixColors(circle.color, accentColor, 0.14), circle.opacity * 0.07 * depthOpacity));
+    edge.addColorStop(0.5, withAlpha(mixColors(circle.color, secondaryColor, 0.24), circle.opacity * 0.21 * depthOpacity));
+    edge.addColorStop(0.68, withAlpha(pooledColor, circle.opacity * 0.25 * depthOpacity));
+    edge.addColorStop(0.84, withAlpha(mixColors(circle.color, accentColor, 0.14), circle.opacity * 0.10 * depthOpacity));
     edge.addColorStop(1, withAlpha(circle.color, 0));
     context.fillStyle = edge;
     context.beginPath();
@@ -650,16 +673,21 @@ function createSecondaryLights(rules, palette, colorWeights, origin, circles, br
 function createFaintLines(rules, palette, colorWeights, origin, circles, secondaryLights, structureAnchors, memoryField, random) {
   const structure = getStructure(rules);
   const profile = getStructureProfile(structure);
+  const totalWeight = colorWeights.reduce((sum, w) => sum + w, 0) || 1;
+  const backgroundLuminance = palette.reduce((sum, color, i) => {
+    const hsl = rgbToHsl(hexToRgb(color));
+    return sum + hsl.l * (colorWeights[i] || 0);
+  }, 0) / totalWeight;
   const structuralAngle = getStructuralAngle(rules);
   const motion = mixAngle(((rules.motionDirection.angle || 0) * Math.PI) / 180, structuralAngle, profile.structureInfluence);
   const perpendicular = motion + Math.PI / 2;
   const lineCount = clampToRange(
     Math.round(
-      (2.7 + structure.repetition * 0.42 + structure.geometricRhythm * 0.38 + memoryField.density * 0.9) *
+      (1.2 + structure.repetition * 0.2 + structure.geometricRhythm * 0.1 + memoryField.density * 0.3) *
         profile.lineMultiplier,
     ),
-    3,
-    6,
+    1,
+    2,
   );
   const structureCenter = {
     x: mixNumber(origin.x, structure.balance.x * WIDTH, 0.56),
@@ -669,122 +697,132 @@ function createFaintLines(rules, palette, colorWeights, origin, circles, seconda
   const lines = [];
   const usedAngles = [];
 
-  for (let index = 0; index < lineCount; index += 1) {
-    const start = pickRelationshipStart(anchors, index);
-    const end = pickRelationshipEnd(anchors, start, index);
-    const midpoint = {
-      x: (start.x + end.x) * 0.5,
-      y: (start.y + end.y) * 0.5,
-    };
-    const distance = Math.hypot(end.x - start.x, end.y - start.y) || 1;
-    let direction = Math.atan2(end.y - start.y, end.x - start.x);
-    if (hasSimilarAngle(direction, usedAngles, 0.24)) {
-      direction += (index % 2 === 0 ? 1 : -1) * (0.32 + structure.geometricRhythm * 0.22);
-    }
-    usedAngles.push(direction);
+  // Derive base angle from image's dominant edge structure (structure tensor output).
+  // motionDirection.angle is in degrees; convert to radians for geometry.
+  const motionAngleRad = (rules.motionDirection.angle * Math.PI) / 180;
 
-    const pathInfluence = mixAngle(direction, motion, start.kind === 'origin' ? 0.1 : 0.18);
-    const curvatureSign = index % 2 === 0 ? 1 : -1;
-    const isCircleArc =
-      (start.kind === 'circle' || end.kind === 'circle' || start.kind === 'structure' || end.kind === 'structure') &&
-      (index % 2 === 0 || structure.shapeEnergy === 'circular');
-    const orbitalBias = isCircleArc ? getOrbitBias(start, end, origin) : 0;
-    const curvature =
-      curvatureSign *
-      (isCircleArc ? 165 + orbitalBias : 82 + rules.blurDensity * 64 + structure.geometricRhythm * 54) *
-      profile.curvatureMultiplier *
-      (structure.shapeEnergy === 'grid-like' ? 0.35 : 1) *
-      (1 + memoryField.rhythm * 0.18);
-    const extension = clampToRange(
-      0.03 + profile.lineLengthMultiplier * 0.024 - memoryField.density * 0.018,
-      0.018,
-      0.095,
-    );
-    const extendedStart = extendPoint(start, end, -distance * extension);
-    const extendedEnd = extendPoint(end, start, -distance * extension);
-    const drift = (random() - 0.5) * distance * (0.035 + memoryField.rhythm * 0.018);
-    const controlA = {
-      x:
-        mixNumber(extendedStart.x, midpoint.x, 0.56) +
-        Math.cos(pathInfluence + Math.PI / 2) * (curvature * 0.58 + drift) +
-        Math.cos(perpendicular) * (random() - 0.5) * 14,
-      y:
-        mixNumber(extendedStart.y, midpoint.y, 0.56) +
-        Math.sin(pathInfluence + Math.PI / 2) * (curvature * 0.58 + drift) +
-        Math.sin(perpendicular) * (random() - 0.5) * 14,
+  // Bias axis choice from image structure: if horizontal energy dominates, prefer
+  // horizontal sweeps; if vertical dominates, prefer diagonal; diagonal image energy
+  // increases diagonal sweep probability.
+  const hDom = structure.horizontalDominance;
+  const vDom = structure.verticalDominance;
+  const dDom = structure.diagonalDominance;
+  const horizontalBias = clampToRange(0.45 + hDom * 0.4 - vDom * 0.25 + dDom * 0.1, 0.25, 0.75);
+
+  // Image's brightest region (normalized 0-1) — lines should emerge from this area.
+  const brightX = rules.lightOrigin.x * WIDTH;
+  const brightY = rules.lightOrigin.y * HEIGHT;
+
+  for (let index = 0; index < lineCount; index += 1) {
+    const isHorizontal = random() < horizontalBias;
+    // Per-line variation: small nudge around the image's dominant angle (±10°).
+    const angleVariation = (random() - 0.5) * (Math.PI * 20 / 180);
+    // The image's structure angle gives us the entry/exit slope — apply directly.
+    const sweepAngle = motionAngleRad + angleVariation;
+
+    let start, end;
+    if (isHorizontal) {
+      // Entry Y biased 60% toward the bright region, 40% free variation.
+      const freeY = 80 + random() * (HEIGHT - 160);
+      const entryY = mixNumber(freeY, clampToRange(brightY, 80, HEIGHT - 80), 0.6);
+      const exitY = clampToRange(entryY + Math.tan(sweepAngle) * WIDTH, -40, HEIGHT + 40);
+      start = { x: -20, y: entryY };
+      end = { x: WIDTH + 20, y: exitY };
+    } else {
+      // Entry X biased 60% toward the bright region.
+      const freeX = 80 + random() * (WIDTH - 160);
+      const entryX = mixNumber(freeX, clampToRange(brightX, 80, WIDTH - 80), 0.6);
+      // Diagonal: derive exit from the perpendicular sweep angle.
+      const perpAngle = sweepAngle + Math.PI / 2;
+      const exitX = clampToRange(entryX + Math.tan(perpAngle) * HEIGHT, -40, WIDTH + 40);
+      start = { x: entryX, y: -20 };
+      end = { x: exitX, y: HEIGHT + 20 };
+    }
+
+    const distance = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+    const direction = Math.atan2(end.y - start.y, end.x - start.x);
+
+    if (hasSimilarAngle(direction, usedAngles, 0.28)) {
+      const nudge = (index % 2 === 0 ? 1 : -1) * (0.35 + random() * 0.2);
+      if (isHorizontal) {
+        end.y = clampToRange(end.y + nudge * 150, -40, HEIGHT + 40);
+      } else {
+        end.x = clampToRange(end.x + nudge * 150, -40, WIDTH + 40);
+      }
+    }
+    usedAngles.push(Math.atan2(end.y - start.y, end.x - start.x));
+
+    // Single quadratic arc — one control point, no direction changes.
+    // Arc side alternates per line so they curve in different directions.
+    const arcSign = index % 2 === 0 ? 1 : -1;
+    const arcOffset = distance * (0.08 + random() * 0.04) * arcSign; // 8–12% of length
+    const perpX = Math.cos(direction + Math.PI / 2);
+    const perpY = Math.sin(direction + Math.PI / 2);
+    // Control point at midpoint, offset perpendicularly
+    const control = {
+      x: (start.x + end.x) / 2 + perpX * arcOffset,
+      y: (start.y + end.y) / 2 + perpY * arcOffset,
     };
-    const controlB = {
-      x:
-        mixNumber(extendedEnd.x, midpoint.x, 0.56) -
-        Math.cos(pathInfluence + Math.PI / 2) * (curvature * 0.46 - drift) +
-        Math.cos(perpendicular) * (random() - 0.5) * 16,
-      y:
-        mixNumber(extendedEnd.y, midpoint.y, 0.56) -
-        Math.sin(pathInfluence + Math.PI / 2) * (curvature * 0.46 - drift) +
-        Math.sin(perpendicular) * (random() - 0.5) * 16,
-    };
+
     const paletteIndex = weightedPaletteIndex(colorWeights, index / Math.max(1, lineCount - 1), index + 13);
-    const localLineColor = mixColors(
-      refineFeatureColor(start.color || palette[paletteIndex], palette, rules),
-      refineFeatureColor(end.color || palette[(paletteIndex + 1) % palette.length], palette, rules),
-      0.5,
-    );
+    const lineBaseColor = refineFeatureColor(palette[paletteIndex], palette, rules);
 
     lines.push({
-      blur: 1.8 + rules.blurDensity * 5.5 + random() * 2,
-      color: mixColors(
-        mixColors(localLineColor, palette[(paletteIndex + 1) % palette.length], 0.24 + random() * 0.18),
-        '#ffffff',
-        0.12,
-      ),
-      opacity: (index < 3 ? 0.16 : 0.09) + random() * 0.04 + memoryField.density * 0.02,
-      points: softenPath(
-        sampleCubic(extendedStart, controlA, controlB, extendedEnd, 96),
-        random,
-        1.2 + rules.blurDensity * 1.8 + memoryField.rhythm * 1.4,
-      ),
-      role: index < 3 ? 'primary' : 'secondary',
-      purpose: `${start.kind || 'memory'} to ${end.kind || 'memory'}`,
-      width: (index < 3 ? 0.68 : 0.42) + random() * 0.22,
+      blur: Math.min(1.4 + rules.blurDensity * 2.6, 6.0),
+      color: mixColors(lineBaseColor, '#ffffff', 0.75),
+      control,
+      end,
+      opacity: ((index < 1 ? 0.25 : 0.18) + random() * 0.03 + memoryField.density * 0.015) * (backgroundLuminance > 0.55 ? 0.85 : 1.0),
+      role: index < 1 ? 'primary' : 'secondary',
+      start,
+      purpose: isHorizontal ? 'horizontal sweep' : 'diagonal sweep',
+      width: (index < 1 ? 1.8 : 1.1) + random() * 0.3,
     });
   }
 
   return lines;
 }
 
+function drawArc(context, line) {
+  context.beginPath();
+  context.moveTo(line.start.x, line.start.y);
+  context.quadraticCurveTo(line.control.x, line.control.y, line.end.x, line.end.y);
+  context.stroke();
+}
+
 function paintFaintLines(context, lines, rules) {
   context.save();
-  context.globalCompositeOperation = 'screen';
+  context.globalCompositeOperation = 'source-over';
   context.lineCap = 'round';
   context.lineJoin = 'round';
 
-  lines.forEach((line, index) => {
+  lines.forEach((line) => {
+    // Luminous halo pass — wide soft glow.
+    context.save();
+    context.filter = 'blur(4px)';
+    context.lineWidth = line.width * 3;
+    context.strokeStyle = withAlpha(line.color, 0.10);
+    drawArc(context, line);
+    context.restore();
+
+    // Diffuse glow pass — medium halo.
     context.save();
     context.filter = `blur(${line.blur + 0.34}px)`;
     context.lineWidth = line.width * (line.role === 'primary' ? 2.45 : 1.9);
-    strokeFadedLine(context, line.points, line.color, line.opacity * (line.role === 'primary' ? 0.42 : 0.3));
+    context.strokeStyle = withAlpha(line.color, line.opacity * (line.role === 'primary' ? 0.72 : 0.52));
+    drawArc(context, line);
     context.restore();
 
+    // Core trace pass — thin, sharp.
     context.save();
-    context.filter = `blur(${line.blur}px)`;
+    context.filter = `blur(${line.blur * 0.5}px)`;
     context.lineWidth = line.width;
-    strokeFadedLine(context, line.points, line.color, line.opacity * (line.role === 'primary' ? 1.48 : index % 4 === 0 ? 1.14 : 0.98));
+    context.strokeStyle = withAlpha(line.color, line.opacity);
+    drawArc(context, line);
     context.restore();
-
   });
 
   context.restore();
-
-  if (rules.blurDensity > 0.78 && lines.length < 7) {
-    context.save();
-    context.globalCompositeOperation = 'screen';
-    context.filter = 'blur(3px)';
-    lines.slice(0, 2).forEach((line) => {
-      context.lineWidth = line.width * 3.5;
-      strokeFadedLine(context, line.points, line.color, 0.014);
-    });
-    context.restore();
-  }
 }
 
 function paintSensoryOrigin(context, palette, secondaryLights, rules, origin) {
@@ -906,8 +944,9 @@ function findIntersections(circles, lines, secondaryLights, origin, brightAnchor
     });
 
     lines.forEach((line, lineIndex) => {
-      for (let pointIndex = 2; pointIndex < line.points.length; pointIndex += 8) {
-        const point = line.points[pointIndex];
+      // Sample start, control, midpoint, end for cluster proximity
+      const samples = [line.start, line.control, { x: (line.start.x + line.end.x) / 2, y: (line.start.y + line.end.y) / 2 }, line.end];
+      for (const point of samples) {
         const distance = Math.hypot(point.x - cluster.centerX, point.y - cluster.centerY);
         if (distance > cluster.radius * 0.58) continue;
 
@@ -927,8 +966,17 @@ function findIntersections(circles, lines, secondaryLights, origin, brightAnchor
   });
 
   lines.forEach((line, lineIndex) => {
-    line.points.forEach((point, pointIndex) => {
-      const previous = line.points[Math.max(0, pointIndex - 1)];
+    // Sample 5 points along the quadratic arc for circle intersection detection
+    const arcSamples = [0, 0.25, 0.5, 0.75, 1].map((t) => {
+      const mt = 1 - t;
+      return {
+        x: mt * mt * line.start.x + 2 * mt * t * line.control.x + t * t * line.end.x,
+        y: mt * mt * line.start.y + 2 * mt * t * line.control.y + t * t * line.end.y,
+      };
+    });
+
+    arcSamples.forEach((point, sampleIndex) => {
+      const previous = arcSamples[Math.max(0, sampleIndex - 1)];
 
       circles.forEach((circle, circleIndex) => {
         const distance = Math.hypot(point.x - circle.x, point.y - circle.y);
@@ -949,7 +997,6 @@ function findIntersections(circles, lines, secondaryLights, origin, brightAnchor
           });
         }
       });
-
     });
   });
 
@@ -958,36 +1005,24 @@ function findIntersections(circles, lines, secondaryLights, origin, brightAnchor
 
     for (let otherIndex = lineIndex + 1; otherIndex < lines.length; otherIndex += 1) {
       const other = lines[otherIndex];
+      // Check crossing using the chord (start→end) of each arc
+      const crossing = getSegmentIntersectionPoint(line.start, line.end, other.start, other.end);
+      if (!crossing) continue;
 
-      for (let pointIndex = 1; pointIndex < line.points.length; pointIndex += 1) {
-        const start = line.points[pointIndex - 1];
-        const end = line.points[pointIndex];
-
-        for (let sampleIndex = 1; sampleIndex < other.points.length; sampleIndex += 1) {
-          const otherStart = other.points[sampleIndex - 1];
-          const otherEnd = other.points[sampleIndex];
-
-          if (!segmentsIntersect(start, end, otherStart, otherEnd)) continue;
-
-          const crossing = getSegmentIntersectionPoint(start, end, otherStart, otherEnd);
-          if (!crossing) continue;
-
-          pushIntersection(events, {
-            color: mixColors(line.color, other.color, 0.5),
-            kind: 'line-line-crossing',
-            lineIndex,
-            otherIndex,
-            sourceRelationship: 'line crossing',
-            strength:
-              0.88 +
-              line.opacity * 1.25 +
-              other.opacity * 1.25 +
-              (line.role === 'primary' || other.role === 'primary' ? 0.2 : 0),
-            x: crossing.x,
-            y: crossing.y,
-          });
-        }
-      }
+      pushIntersection(events, {
+        color: mixColors(line.color, other.color, 0.5),
+        kind: 'line-line-crossing',
+        lineIndex,
+        otherIndex,
+        sourceRelationship: 'line crossing',
+        strength:
+          0.88 +
+          line.opacity * 1.25 +
+          other.opacity * 1.25 +
+          (line.role === 'primary' || other.role === 'primary' ? 0.2 : 0),
+        x: crossing.x,
+        y: crossing.y,
+      });
     }
   });
 
@@ -1018,7 +1053,7 @@ function pushIntersection(events, event) {
 
 function paintIntersections(context, intersections, palette, rules) {
   context.save();
-  context.globalCompositeOperation = 'screen';
+  context.globalCompositeOperation = 'source-over';
 
   intersections.forEach((event, index) => {
     const color = event.color || palette[index % palette.length];
@@ -1030,6 +1065,7 @@ function paintIntersections(context, intersections, palette, rules) {
       : 26 + strength * 58 + rules.averageBrightness * 12;
 
     context.save();
+    context.globalCompositeOperation = 'source-over';
     context.filter = `blur(${isLineCrossing ? 3.4 + rules.blurDensity * 3 : 3.2 + rules.blurDensity * 3.4}px)`;
     const glow = context.createRadialGradient(event.x, event.y, 0, event.x, event.y, radius);
     glow.addColorStop(0, `rgba(255,255,255,${(isLineCrossing ? 0.3 : 0.18) + strength * 0.16})`);
@@ -1042,11 +1078,11 @@ function paintIntersections(context, intersections, palette, rules) {
 
     if (isLineCrossing || (strength > 0.64 && (event.relationshipCount || 1) > 1)) {
       context.save();
-      context.globalCompositeOperation = 'screen';
-      context.filter = `blur(${isLineCrossing ? 1.4 : 1.2}px)`;
-      context.fillStyle = `rgba(255,255,255,${(isLineCrossing ? 0.18 : 0.08) + strength * 0.09})`;
+      context.globalCompositeOperation = 'source-over';
+      context.filter = 'blur(0.5px)';
+      context.fillStyle = 'rgba(255,255,255,0.7)';
       context.beginPath();
-      context.arc(event.x, event.y, isLineCrossing ? 4 + strength * 3 : 1.2 + strength * 1.6, 0, Math.PI * 2);
+      context.arc(event.x, event.y, isLineCrossing ? 4 + strength * 2 : 2 + strength * 2, 0, Math.PI * 2);
       context.fill();
       context.restore();
     }
@@ -1058,10 +1094,13 @@ function paintIntersections(context, intersections, palette, rules) {
 function paintTexture(context, palette, rules, memoryField, random) {
   const imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
   const data = imageData.data;
-  const density = 5.6 + rules.blurDensity * 5.6 + memoryField.density * 5.2;
+  // Density 3–4× heavier than before for visible 35mm-style texture
+  const density = 18 + rules.blurDensity * 18 + memoryField.density * 14;
   const contrast = 1.015 + rules.blurDensity * 0.018;
   const phaseA = random() * Math.PI * 2;
   const phaseB = random() * Math.PI * 2;
+  // Pre-extract palette RGB for colored grain tinting
+  const paletteRgb = palette.map((c) => hexToRgb(c));
 
   for (let index = 0; index < data.length; index += 4) {
     const pixel = index / 4;
@@ -1072,16 +1111,44 @@ function paintTexture(context, palette, rules, memoryField, random) {
       Math.sin(x * 0.012 + y * 0.008 + phaseA) * 1.8 +
       Math.sin(x * 0.027 - y * 0.014 + phaseB) * 1.1;
     const fieldInfluence = memoryFieldInfluence(memoryField, x, y);
-    const brightGrainLift = luma > 180 ? 1.45 + fieldInfluence * 0.36 : 1 + fieldInfluence * 0.28;
-    const grain = (random() - 0.5) * density * brightGrainLift;
+    const brightGrainLift = luma > 160 ? 1.45 + fieldInfluence * 0.36 : 1 + fieldInfluence * 0.28;
+
+    // Colored grain — two passes (light and dark), per-channel tinted by palette
+    const palIdx = Math.floor(random() * paletteRgb.length);
+    const pal = paletteRgb[palIdx] || paletteRgb[0];
+    const grainMag = (random() - 0.5) * density * brightGrainLift;
+    let grainR, grainG, grainB;
+
+    if (grainMag >= 0) {
+      // Pass 1: light grain — tinted toward white + palette color
+      const lightTint = 0.3 + random() * 0.2;
+      const lightR = 255 * (1 - lightTint) + pal[0] * lightTint;
+      const lightG = 255 * (1 - lightTint) + pal[1] * lightTint;
+      const lightB = 255 * (1 - lightTint) + pal[2] * lightTint;
+      // Scale: opacity range 0.08–0.18 mapped to grain delta
+      const lightScale = (0.08 + random() * 0.10) * brightGrainLift;
+      grainR = (lightR - data[index]) * lightScale;
+      grainG = (lightG - data[index + 1]) * lightScale;
+      grainB = (lightB - data[index + 2]) * lightScale;
+    } else {
+      // Pass 2: dark grain — tinted toward black + palette color
+      const darkTint = 0.2 + random() * 0.2;
+      const darkR = pal[0] * darkTint;
+      const darkG = pal[1] * darkTint;
+      const darkB = pal[2] * darkTint;
+      const darkScale = (0.06 + random() * 0.08) * brightGrainLift;
+      grainR = (darkR - data[index]) * darkScale;
+      grainG = (darkG - data[index + 1]) * darkScale;
+      grainB = (darkB - data[index + 2]) * darkScale;
+    }
+
     const particleThreshold = 0.986 - memoryField.density * 0.012 - fieldInfluence * 0.01;
     const particle = random() > particleThreshold ? (random() - 0.5) * (13 + rules.blurDensity * 10 + memoryField.density * 10) : 0;
     const fiber = random() > 0.995 - memoryField.density * 0.002 ? (random() - 0.5) * 18 : 0;
-    const texture = grain + cloud + particle + fiber;
 
-    data[index] = clamp(data[index] * contrast + texture);
-    data[index + 1] = clamp(data[index + 1] * contrast + texture);
-    data[index + 2] = clamp(data[index + 2] * contrast + texture);
+    data[index] = clamp(data[index] * contrast + grainR + cloud + particle + fiber);
+    data[index + 1] = clamp(data[index + 1] * contrast + grainG + cloud + particle + fiber);
+    data[index + 2] = clamp(data[index + 2] * contrast + grainB + cloud + particle + fiber);
   }
 
   context.putImageData(imageData, 0, 0);
@@ -1121,9 +1188,9 @@ function paintTexture(context, palette, rules, memoryField, random) {
 function applyContrastPass(context, palette, rules) {
   const imageData = context.getImageData(0, 0, WIDTH, HEIGHT);
   const data = imageData.data;
-  const contrast = 1.26 + rules.averageBrightness * 0.1;
-  const pivot = 126 - rules.averageBrightness * 12;
-  const saturation = 1.18;
+  const contrast = 1.40 + rules.averageBrightness * 0.08;
+  const pivot = 100 - rules.averageBrightness * 10;
+  const saturation = 1.24;
 
   for (let index = 0; index < data.length; index += 4) {
     let r = pivot + (data[index] - pivot) * contrast;
@@ -1308,8 +1375,13 @@ function pickRelationshipStart(anchors, index) {
 }
 
 function pickRelationshipEnd(anchors, start, index) {
-  const ranked = anchors
-    .filter((anchor) => anchor !== start)
+  const pool = start.kind !== 'origin'
+    ? anchors.filter((anchor) => anchor !== start && anchor.kind !== 'origin')
+    : anchors.filter((anchor) => anchor !== start);
+  const candidates = pool.length ? pool : anchors.filter((anchor) => anchor !== start);
+  const distant = candidates.filter((a) => Math.hypot(a.x - start.x, a.y - start.y) >= 300);
+  const distantPool = distant.length >= 2 ? distant : candidates;
+  const ranked = distantPool
     .map((anchor) => {
       const distance = Math.hypot(anchor.x - start.x, anchor.y - start.y);
       const kindScore =
@@ -1333,7 +1405,7 @@ function pickRelationshipEnd(anchors, start, index) {
     })
     .sort((a, b) => b.score - a.score);
 
-  return ranked[index % Math.max(1, Math.min(3, ranked.length))]?.anchor || anchors[0];
+  return ranked[index % Math.max(1, Math.min(3, ranked.length))]?.anchor || distantPool[0] || candidates[0] || anchors[0];
 }
 
 function extendPoint(from, toward, amount) {
@@ -1344,6 +1416,20 @@ function extendPoint(from, toward, amount) {
     x: from.x + (dx / length) * amount,
     y: from.y + (dy / length) * amount,
   };
+}
+
+function projectToCanvasEdge(from, toward) {
+  const dx = from.x - toward.x;
+  const dy = from.y - toward.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const pad = -30;
+  const tx = ux > 0 ? (WIDTH - pad - from.x) / ux : ux < 0 ? (pad - from.x) / ux : Infinity;
+  const ty = uy > 0 ? (HEIGHT - pad - from.y) / uy : uy < 0 ? (pad - from.y) / uy : Infinity;
+  const t = Math.min(tx > 0 ? tx : Infinity, ty > 0 ? ty : Infinity);
+  if (!Number.isFinite(t)) return from;
+  return { x: from.x + ux * t, y: from.y + uy * t };
 }
 
 function hasSimilarAngle(angle, usedAngles, threshold) {
