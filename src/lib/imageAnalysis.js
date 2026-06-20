@@ -30,7 +30,7 @@ export async function analyzeImage(imageUrl) {
         brightest = { value: light, x, y };
       }
 
-      const bucketKey = [r, g, b].map((value) => Math.round(value / 32) * 32).join(',');
+      const bucketKey = [r, g, b].map((value) => Math.round(value / 18) * 18).join(',');
       const current = paletteBuckets.get(bucketKey) || {
         count: 0,
         r: 0,
@@ -43,7 +43,7 @@ export async function analyzeImage(imageUrl) {
       current.r += r;
       current.g += g;
       current.b += b;
-      current.score += 0.65 + saturation * 0.75 + light * 0.35;
+      current.score += 0.4 + saturation * 2.2 + light * 0.2;
       paletteBuckets.set(bucketKey, current);
     }
   }
@@ -308,7 +308,7 @@ function extractPalette(bucketMap) {
     }))
     .sort((a, b) => b.score - a.score)
     .reduce((result, color) => {
-      const isTooClose = result.some((existing) => colorDistance(existing.rgb, color.rgb) < 58);
+      const isTooClose = result.some((existing) => colorDistance(existing.rgb, color.rgb) < 32);
       return isTooClose || result.length >= 5 ? result : [...result, color];
     }, []);
 

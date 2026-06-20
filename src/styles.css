@@ -42,14 +42,19 @@ input {
   pointer-events: none;
 }
 
-/* ─── Hidden file input ──────────────────────────────────────────────────────── */
+/* ─── Cursor dot ─────────────────────────────────────────────────────────────── */
 
-.hidden-file {
+.cursor-dot {
   position: fixed;
-  width: 0;
-  height: 0;
-  opacity: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
   pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 200ms;
 }
 
 /* ─── Top nav ────────────────────────────────────────────────────────────────── */
@@ -59,7 +64,7 @@ input {
   top: 0;
   left: 0;
   right: 0;
-  z-index: 20;
+  z-index: 100;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -67,11 +72,24 @@ input {
   pointer-events: none;
 }
 
+.top-nav > * {
+  pointer-events: auto;
+}
+
 .wordmark-link {
   display: inline-flex;
   align-items: center;
   text-decoration: none;
-  pointer-events: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: none;
+  opacity: 0.75;
+  transition: opacity 200ms;
+}
+
+.wordmark-link:hover {
+  opacity: 1;
 }
 
 .wordmark-img {
@@ -82,16 +100,48 @@ input {
   filter: invert(1) opacity(0.42);
 }
 
+.wordmark-text {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.75);
+  text-transform: uppercase;
+}
+
 .nav-status {
-  font-size: 13px;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
   color: rgba(255, 255, 255, 0.22);
   font-weight: 400;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.archive-nav-btn {
+  background: none;
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.08em;
+  cursor: none;
+  transition: color 200ms, border-color 200ms, background 200ms;
+}
+
+.archive-nav-btn:hover {
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* ─── Bottom bar ─────────────────────────────────────────────────────────────── */
 
 .bottom-bar {
+  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
@@ -99,6 +149,7 @@ input {
   display: flex;
   justify-content: center;
   align-items: center;
+  gap: 32px;
   padding: 20px 36px;
   pointer-events: none;
 }
@@ -112,7 +163,6 @@ input {
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.14);
   font-weight: 400;
-  transition: color 500ms;
 }
 
 .step-list li {
@@ -141,7 +191,6 @@ input {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
   opacity: 0;
   pointer-events: none;
   transition: opacity 650ms ease;
@@ -150,75 +199,6 @@ input {
 .phase-screen.phase-in {
   opacity: 1;
   pointer-events: auto;
-}
-
-/* ─── Phase: idle ────────────────────────────────────────────────────────────── */
-
-.idle-content {
-  position: relative;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  pointer-events: none;
-  user-select: none;
-}
-
-.hero-title {
-  font-size: clamp(42px, 8vw, 72px);
-  font-weight: 200;
-  color: rgba(255, 255, 255, 0.88);
-  letter-spacing: -0.05em;
-  line-height: 0.98;
-  text-align: center;
-}
-
-.hero-sub {
-  margin-top: 16px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.25);
-  font-weight: 400;
-  letter-spacing: 0.04em;
-}
-
-.click-hint {
-  margin-top: 44px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.2);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  animation: hint-pulse 2.5s ease-in-out infinite;
-}
-
-@keyframes hint-pulse {
-  0%, 100% { opacity: 0.2; }
-  50%       { opacity: 0.5; }
-}
-
-@keyframes gentlePulse {
-  0%, 100% { opacity: 0.15; }
-  50%       { opacity: 0.5; }
-}
-
-/* ─── Phase: uploaded ────────────────────────────────────────────────────────── */
-
-.preview-portrait {
-  width: 200px;
-  height: 200px;
-  border-radius: 18px;
-  object-fit: cover;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  display: block;
-}
-
-.file-name-label {
-  margin-top: 24px;
-  margin-bottom: 24px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.3);
-  letter-spacing: 0.04em;
-  font-weight: 400;
 }
 
 /* ─── Pill buttons ───────────────────────────────────────────────────────────── */
@@ -231,6 +211,7 @@ input {
   font-size: 14px;
   color: rgba(217, 207, 234, 0.85);
   cursor: none;
+  white-space: nowrap;
   transition:
     background 200ms ease,
     border-color 200ms ease,
@@ -246,31 +227,706 @@ input {
 }
 
 .pill-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
+  opacity: 0.45;
+  cursor: none;
 }
 
-.pill-btn--save {
-  margin-top: 20px;
+/* ─── STEP 01 + 02: Browse / Selected ───────────────────────────────────────── */
+
+.browse-screen {
+  justify-content: flex-start;
+  padding-top: 88px;
+  padding-bottom: 72px;
+  overflow-y: auto;
+  gap: 0;
 }
 
-/* ─── Phase: scanning ────────────────────────────────────────────────────────── */
+.browse-screen::-webkit-scrollbar { display: none; }
+.browse-screen { -ms-overflow-style: none; scrollbar-width: none; }
 
-.scan-wrap {
+.browse-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* 5열 그리드, 셀 이미지 176px */
+.archive-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 176px);
+  gap: 14px 14px;
+  flex-shrink: 0;
+}
+
+.archive-cell {
+  width: 176px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: none;
+  opacity: 0.62;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: opacity 300ms ease, transform 300ms ease, filter 300ms ease;
+}
+
+.archive-cell:hover {
+  opacity: 0.9;
+}
+
+.archive-cell:hover .archive-cell-img {
+  border-color: rgba(217, 207, 234, 0.4);
+}
+
+.archive-cell--selected {
+  opacity: 1;
+  transform: scale(1.04);
+  filter: brightness(1.1);
+}
+
+.archive-cell--selected .archive-cell-img {
+  border-color: rgba(217, 207, 234, 0.7);
+  border-width: 1px;
+}
+
+.archive-cell--dimmed {
+  opacity: 0.25;
+}
+
+.archive-cell-img {
+  width: 176px;
+  height: 176px;
+  object-fit: cover;
+  display: block;
+  border-radius: 6px;
+  border: 0.5px solid transparent;
+  transition: border-color 300ms ease;
+}
+
+/* 셀 하단 레이블 */
+.archive-cell-caption {
+  padding: 7px 2px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  width: 100%;
+}
+
+.archive-cell-num {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.08em;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  line-height: 1;
+}
+
+.archive-cell-title {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.48);
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 172px;
+}
+
+.browse-hint {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 32px;
+  margin-bottom: 56px;
+  letter-spacing: 0.02em;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.analyze-start-btn {
+  margin-top: 56px;
+  flex-shrink: 0;
+}
+
+/* ─── STEP 03: Feeling / Keyword Selection ───────────────────────────────────── */
+
+.feeling-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feeling-layout {
+  display: flex;
+  align-items: center;
+  gap: 64px;
+  max-width: 860px;
+  width: 100%;
+}
+
+.feeling-image-wrap {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.feeling-preview-img {
+  width: 200px;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 0.5px solid rgba(217, 207, 234, 0.18);
+  filter: brightness(0.9);
+}
+
+.feeling-img-label {
+  font-size: 11px;
+  color: rgba(217, 207, 234, 0.45);
+  letter-spacing: 0.04em;
+  text-align: center;
+  max-width: 200px;
+}
+
+.feeling-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.feeling-title {
+  font-size: 18px;
+  font-weight: 300;
+  color: rgba(217, 207, 234, 0.9);
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
+.feeling-subtitle {
+  font-size: 12px;
+  color: rgba(217, 207, 234, 0.38);
+  letter-spacing: 0.06em;
+  margin-top: -12px;
+}
+
+.keyword-grid {
+  display: grid;
+  grid-template-columns: repeat(5, auto);
+  gap: 8px;
+}
+
+.keyword-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 16px;
+  background: rgba(217, 207, 234, 0.05);
+  border: 0.5px solid rgba(217, 207, 234, 0.14);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 180ms, border-color 180ms, transform 140ms;
+}
+
+.keyword-chip:hover {
+  background: rgba(217, 207, 234, 0.10);
+  border-color: rgba(217, 207, 234, 0.28);
+  transform: translateY(-1px);
+}
+
+.keyword-chip--selected {
+  background: rgba(180, 150, 255, 0.15);
+  border-color: rgba(180, 150, 255, 0.55);
+}
+
+.keyword-chip-ko {
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(217, 207, 234, 0.88);
+  letter-spacing: 0.02em;
+}
+
+.keyword-chip-en {
+  font-size: 9px;
+  color: rgba(217, 207, 234, 0.32);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.keyword-chip--selected .keyword-chip-ko {
+  color: rgba(200, 180, 255, 1);
+}
+
+.keyword-chip--selected .keyword-chip-en {
+  color: rgba(180, 150, 255, 0.55);
+}
+
+.feeling-next-btn {
+  align-self: flex-start;
+  margin-top: 4px;
+  opacity: 1;
+  transition: opacity 180ms;
+}
+
+.feeling-next-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ─── STEP 04 + 05: Analysis / Generation ───────────────────────────────────── */
+
+.analysis-layout {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+}
+
+.analysis-image-wrap {
   position: relative;
+  width: 240px;
+  height: 240px;
+  flex-shrink: 0;
 }
 
+.analysis-img {
+  width: 240px;
+  height: 240px;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+}
+
+/* scan-overlay: position absolute, dimensions from inline style */
 .scan-overlay {
   position: absolute;
   inset: 0;
-  border-radius: 18px;
+  border-radius: 14px;
   pointer-events: none;
-  /* CSS width/height match the preview-portrait */
-  width: 600px;
-  height: 600px;
 }
 
-/* Analysis cards */
+.analysis-panel {
+  width: 260px;
+  background: rgba(14, 11, 20, 0.72);
+  border: 0.5px solid rgba(217, 207, 234, 0.12);
+  border-radius: 16px;
+  padding: 24px 20px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.analysis-panel-title {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(217, 207, 234, 0.55);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 20px;
+}
+
+.analysis-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.analysis-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.analysis-row-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.28);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.analysis-bar-track {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.analysis-bar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(217, 207, 234, 0.25), rgba(217, 207, 234, 0.65));
+}
+
+/* analyzing: 0% → 85% */
+.analysis-bar-fill--analyzing {
+  animation: bar-grow-analyze 1400ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes bar-grow-analyze {
+  from { width: 0%; }
+  to   { width: 85%; }
+}
+
+/* generating: 0% → 100% */
+.analysis-bar-fill--generating {
+  animation: bar-grow-generate 700ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes bar-grow-generate {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+.analysis-percent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.analysis-percent-num {
+  font-size: 11px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  color: rgba(217, 207, 234, 0.45);
+  letter-spacing: 0.04em;
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.analysis-percent-bar-track {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.analysis-percent-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(217, 207, 234, 0.4);
+  transition: width 80ms linear;
+}
+
+/* ─── Light graphic fullscreen canvas ───────────────────────────────────────── */
+
+.light-bg-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 2;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 1200ms ease;
+  filter: brightness(0.55);
+  pointer-events: none;
+}
+
+.light-bg-canvas--visible {
+  opacity: 1;
+}
+
+/* ─── STEP 05: Projecting ────────────────────────────────────────────────────── */
+
+.projecting-screen {
+  z-index: 12;
+}
+
+/* 기록 카드 — 화면 오른쪽 하단 */
+.record-card {
+  position: absolute;
+  bottom: 80px;
+  right: 48px;
+  width: 220px;
+  background: rgba(14, 11, 20, 0.78);
+  border: 0.5px solid rgba(217, 207, 234, 0.15);
+  border-radius: 14px;
+  padding: 18px 16px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: card-enter 600ms 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes card-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.record-card-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(217, 207, 234, 0.55);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.record-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.record-card-row:last-child {
+  margin-bottom: 0;
+}
+
+.record-card-label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.25);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.record-card-value {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  letter-spacing: 0.04em;
+  text-align: right;
+}
+
+.record-card-ts {
+  font-size: 9px;
+}
+
+.record-card-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  display: block;
+  flex-shrink: 0;
+}
+
+.record-card-dots {
+  display: flex;
+  gap: 5px;
+}
+
+.record-card-dot {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 하단 중앙 버튼 쌍 */
+.projecting-btns {
+  position: absolute;
+  bottom: 60px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  white-space: nowrap;
+  animation: card-enter 600ms 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ─── Archive 뷰 ─────────────────────────────────────────────────────────────── */
+
+.archive-phase {
+  justify-content: flex-start;
+  padding-top: 80px;
+  padding-bottom: 60px;
+  overflow-y: auto;
+  align-items: center;
+}
+
+.archive-phase::-webkit-scrollbar { display: none; }
+.archive-phase { -ms-overflow-style: none; scrollbar-width: none; }
+
+.archive-phase-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 32px;
+  flex-shrink: 0;
+}
+
+.archive-back-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  cursor: none;
+  letter-spacing: 0.06em;
+  padding: 0;
+  transition: color 200ms;
+}
+
+.archive-back-btn:hover {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.archive-phase-title {
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.archive-empty {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.2);
+  letter-spacing: 0.06em;
+}
+
+.archive-phase-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 220px);
+  gap: 12px;
+}
+
+.archive-phase-item {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: none;
+}
+
+.archive-phase-item:hover .archive-hover-info {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.archive-phase-item:hover .archive-phase-img {
+  filter: brightness(0.45);
+}
+
+.archive-phase-img {
+  width: 220px;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+  transition: filter 220ms ease;
+}
+
+/* 삭제 버튼 */
+.archive-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(14, 11, 20, 0.70);
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: none;
+  opacity: 0;
+  transition: opacity 180ms, background 180ms, color 180ms;
+  z-index: 2;
+}
+
+.archive-phase-item:hover .archive-delete-btn {
+  opacity: 1;
+}
+
+.archive-delete-btn:hover {
+  background: rgba(200, 60, 60, 0.70);
+  color: #fff;
+  border-color: rgba(200, 60, 60, 0.5);
+}
+
+/* 호버 정보 오버레이 */
+.archive-hover-info {
+  position: absolute;
+  inset: 0;
+  background: rgba(14, 11, 20, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 18px 16px 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.archive-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.archive-info-label {
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  color: rgba(217, 207, 234, 0.38);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.archive-info-value {
+  font-size: 11px;
+  color: rgba(217, 207, 234, 0.82);
+  letter-spacing: 0.03em;
+  text-align: right;
+}
+
+.archive-info-date {
+  font-size: 10px;
+}
+
+.archive-info-dots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.archive-info-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.archive-download-btn {
+  margin-top: auto;
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.08);
+  border: 0.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: none;
+  letter-spacing: 0.06em;
+  transition: color 180ms, background 180ms;
+}
+
+.archive-download-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.13);
+}
+
+/* ─── Analysis card (기존 스타일 유지) ──────────────────────────────────────── */
 
 .analysis-card {
   position: absolute;
@@ -290,14 +946,11 @@ input {
 }
 
 .analysis-card--in {
-  animation: card-enter 450ms ease forwards;
+  animation: analysis-card-enter 450ms ease forwards;
 }
 
-@keyframes card-enter {
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+@keyframes analysis-card-enter {
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .card-title {
@@ -320,8 +973,6 @@ input {
   animation: fadeInUp 600ms ease forwards;
 }
 
-/* Card 1 — color palette dots */
-
 .card-palette-row {
   display: flex;
   gap: 6px;
@@ -336,8 +987,6 @@ input {
   background: rgba(90, 84, 104, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
-
-/* Card 2 — blur density bar */
 
 .card-bar-track {
   height: 5px;
@@ -356,7 +1005,7 @@ input {
 }
 
 .card-bar-fill--go {
-  animation: bar-fill 900ms ease-out forwards;
+  animation: legacy-bar-fill 900ms ease-out forwards;
 }
 
 @keyframes fadeInUp {
@@ -364,81 +1013,58 @@ input {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes bar-fill {
+@keyframes legacy-bar-fill {
   to { width: 62%; }
 }
 
-/* ─── Phase: done ────────────────────────────────────────────────────────────── */
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
 
-.result-canvas {
-  width: 260px;
-  height: 260px;
-  border-radius: 18px;
-  border: 0.5px solid rgba(255, 255, 255, 0.08);
-  display: block;
-  margin-bottom: 20px;
-}
-
-.compare-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.compare-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 0.5px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.compare-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.25);
-  letter-spacing: 0.06em;
-  font-weight: 500;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  text-align: center;
-}
-
-.compare-img {
-  width: 200px !important;
-  height: 200px !important;
-  border-radius: 8px;
-  display: block;
-  object-fit: cover;
-}
-
-.compare-blank {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.compare-arrow {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.15);
-  flex-shrink: 0;
+@keyframes gentlePulse {
+  0%, 100% { opacity: 0.15; }
+  50%       { opacity: 0.5; }
 }
 
 /* ─── Responsive ─────────────────────────────────────────────────────────────── */
 
-@media (max-width: 680px) {
+@media (max-width: 720px) {
   html, body {
     overflow-y: auto;
   }
 
-  .phase-screen {
-    position: relative;
-    inset: unset;
-    min-height: 100vh;
-    padding: 80px 20px 100px;
+  .archive-grid {
+    grid-template-columns: repeat(2, 148px);
+    gap: 10px;
   }
 
-  .analysis-card {
-    display: none; /* hide cards on small screens — they overflow */
+  .archive-cell {
+    width: 148px;
+  }
+
+  .archive-cell-img {
+    width: 148px;
+    height: 148px;
+  }
+
+  .analysis-layout {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .record-card {
+    bottom: auto;
+    right: auto;
+    position: relative;
+    width: auto;
+    margin-top: 16px;
+  }
+
+  .projecting-btns {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+    flex-direction: column;
+    margin-top: 16px;
   }
 
   .step-list {
@@ -450,17 +1076,13 @@ input {
   .bottom-bar {
     padding: 16px 20px;
   }
-}
 
-/* ─── Extracted card animation ───────────────────────────────────────────────── */
+  .archive-phase-grid {
+    grid-template-columns: repeat(2, 160px);
+  }
 
-.extracted-card {
-  opacity: 0;
-  transform: translateY(40px) scale(0.9);
-  transition: opacity 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
-              transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.extracted-card.in {
-  opacity: 1;
-  transform: translateY(0) scale(1);
+  .archive-phase-img {
+    width: 160px;
+    height: 160px;
+  }
 }

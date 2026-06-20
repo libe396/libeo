@@ -2,49 +2,147 @@ import { useEffect, useRef, useState } from 'react';
 import wordmark from './assets/libeo-logo.svg';
 import { analyzeImage } from './lib/imageAnalysis.js';
 import { renderLightGraphic } from './lib/lightRenderer.js';
+import { ARCHIVE_META } from './archiveMeta.js';
+
+// src/assets/archive/ 폴더의 이미지를 빌드 타임에 자동 수집
+// 파일을 추가/삭제하면 dev 서버가 자동으로 반영합니다
+const REAL_PHOTO_GLOB = import.meta.glob(
+  './assets/archive/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}',
+  { eager: true, query: '?url', import: 'default' },
+);
+
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 
-// 잉크 파티클에 사용할 색상 팔레트 (보라, 라벤더, 핑크, 스카이블루 계열)
 const INK_COLORS = [
-  [255, 220, 210],  // peach
-  [220, 210, 255],  // lavender
-  [195, 235, 255],  // ice blue
-  [255, 210, 230],  // rose pink
-  [200, 255, 240],  // mint
-  [255, 240, 195],  // cream yellow
-  [230, 215, 255],  // soft violet
-  [210, 245, 255],  // periwinkle
+  [255, 220, 210], [220, 210, 255], [195, 235, 255],
+  [255, 210, 230], [200, 255, 240], [255, 240, 195],
+  [230, 215, 255], [210, 245, 255],
 ];
 
 const RIPPLE_COLORS = [
-  [220, 210, 255],  // lavender
-  [255, 220, 210],  // peach
-  [195, 235, 255],  // ice blue
-  [255, 210, 230],  // rose pink
+  [220, 210, 255], [255, 220, 210], [195, 235, 255], [255, 210, 230],
 ];
 
-// 하단 바에 표시할 단계 이름
-const FLOW_STEPS = ['upload', 'extract', 'transform', 'generate', 'archive'];
+const FLOW_STEPS = ['browse', 'select', 'feel', 'analyze', 'generate', 'record'];
 
-// ─── 배경 캔버스 (잉크 인터랙션) ──────────────────────────────────────────────
+const EMOTION_KEYWORDS = [
+  { id: 'longing',     ko: '그리움',  en: 'longing' },
+  { id: 'flutter',     ko: '설렘',    en: 'flutter' },
+  { id: 'stillness',   ko: '고요함',  en: 'stillness' },
+  { id: 'sadness',     ko: '슬픔',    en: 'sadness' },
+  { id: 'warmth',      ko: '따뜻함',  en: 'warmth' },
+  { id: 'emptiness',   ko: '공허함',  en: 'emptiness' },
+  { id: 'strangeness', ko: '낯섦',    en: 'strangeness' },
+  { id: 'anxiety',     ko: '불안',    en: 'anxiety' },
+  { id: 'serenity',    ko: '평온',    en: 'serenity' },
+  { id: 'bittersweet', ko: '아련함',  en: 'bittersweet' },
+];
 
-function InkBg({ phase }) {
+// ─── 실제 사진 로드 (src/assets/archive/ 폴더) ────────────────────────────────
+
+function buildRealPhotoList() {
+  const entries = Object.entries(REAL_PHOTO_GLOB)
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  return entries.map(([path, url], idx) => {
+    // 파일명에서 슬롯 번호 추출 (예: "01.jpg" → "01")
+    const slotMatch = path.match(/(\d+)\.[^.]+$/);
+    const slot = slotMatch
+      ? slotMatch[1].padStart(2, '0')
+      : String(idx + 1).padStart(2, '0');
+    const meta = ARCHIVE_META.find(m => m.slot === slot);
+    return {
+      id: `IMAGE_${slot}`,
+      label: meta?.label ?? '',
+      src: url,          // 실제 사진 URL
+      dataUrl: url,      // analyzeImage() 호환용 (같은 값)
+      isReal: true,
+    };
+  });
+}
+
+// ─── 절차적 블러 플레이스홀더 (사진이 없을 때 fallback) ──────────────────────
+
+// 아카이브 이미지 12장의 블러 블롭 정의
+const ARCHIVE_SPECS = [
+  { blobs: [{ rgb: [140, 100, 210], x: 0.38, y: 0.42, r: 0.38 }, { rgb: [180, 140, 230], x: 0.65, y: 0.58, r: 0.32 }] },
+  { blobs: [{ rgb: [210, 100, 140], x: 0.50, y: 0.35, r: 0.40 }, { rgb: [240, 150, 175], x: 0.62, y: 0.65, r: 0.28 }] },
+  { blobs: [{ rgb: [80,  130, 210], x: 0.32, y: 0.50, r: 0.36 }, { rgb: [110, 175, 240], x: 0.68, y: 0.40, r: 0.30 }] },
+  { blobs: [{ rgb: [80,  170, 130], x: 0.45, y: 0.55, r: 0.38 }, { rgb: [110, 210, 155], x: 0.60, y: 0.30, r: 0.26 }] },
+  { blobs: [{ rgb: [200, 150, 75],  x: 0.40, y: 0.45, r: 0.36 }, { rgb: [230, 190, 110], x: 0.65, y: 0.60, r: 0.30 }] },
+  { blobs: [{ rgb: [160, 120, 210], x: 0.30, y: 0.38, r: 0.32 }, { rgb: [190, 155, 230], x: 0.60, y: 0.50, r: 0.34 }, { rgb: [145, 105, 195], x: 0.50, y: 0.70, r: 0.24 }] },
+  { blobs: [{ rgb: [65,  165, 185], x: 0.42, y: 0.48, r: 0.38 }, { rgb: [95,  205, 215], x: 0.66, y: 0.35, r: 0.28 }] },
+  { blobs: [{ rgb: [195, 120, 160], x: 0.50, y: 0.42, r: 0.40 }, { rgb: [170, 100, 140], x: 0.35, y: 0.62, r: 0.30 }] },
+  { blobs: [{ rgb: [60,  80,  185], x: 0.38, y: 0.45, r: 0.36 }, { rgb: [95,  115, 215], x: 0.65, y: 0.55, r: 0.32 }] },
+  { blobs: [{ rgb: [205, 165, 85],  x: 0.45, y: 0.40, r: 0.34 }, { rgb: [235, 200, 130], x: 0.60, y: 0.62, r: 0.28 }, { rgb: [180, 145, 70], x: 0.30, y: 0.60, r: 0.24 }] },
+];
+
+// 분석 패널의 항목 행 정의
+const ANALYSIS_ROWS = [
+  { label: 'COLOR',          delay: 0    },
+  { label: 'BRIGHTNESS',     delay: 550  },
+  { label: 'BLUR',           delay: 1100 },
+  { label: 'SPREAD',         delay: 1650 },
+  { label: 'CORE STRUCTURE', delay: 2200 },
+];
+
+// ─── 절차적 아카이브 이미지 생성 ────────────────────────────────────────────────
+
+function generateArchiveImages() {
+  return ARCHIVE_SPECS.map((spec, idx) => {
+    const size = 320;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#0e0b14';
+    ctx.fillRect(0, 0, size, size);
+
+    ctx.filter = 'blur(44px)';
+    spec.blobs.forEach(blob => {
+      const px = blob.x * size;
+      const py = blob.y * size;
+      const radius = blob.r * size;
+      const grad = ctx.createRadialGradient(px, py, 0, px, py, radius);
+      grad.addColorStop(0,    `rgba(${blob.rgb[0]},${blob.rgb[1]},${blob.rgb[2]},0.60)`);
+      grad.addColorStop(0.40, `rgba(${blob.rgb[0]},${blob.rgb[1]},${blob.rgb[2]},0.25)`);
+      grad.addColorStop(1,    `rgba(${blob.rgb[0]},${blob.rgb[1]},${blob.rgb[2]},0)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+    });
+    ctx.filter = 'none';
+
+    const slot = String(idx + 1).padStart(2, '0');
+    const meta = ARCHIVE_META.find(m => m.slot === slot);
+    const dataUrl = canvas.toDataURL('image/png');
+    return {
+      id: `IMAGE_${slot}`,
+      label: meta?.label ?? '',
+      src: dataUrl,
+      dataUrl,
+      isReal: false,
+    };
+  });
+}
+
+// ─── InkBg (배경 잉크 인터랙션) ─────────────────────────────────────────────────
+
+function InkBg() {
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const particles = []; // 현재 화면에 살아있는 파티클 목록
+    const particles = [];
     const ripples = [];
-    let lastX = -1, lastY = -1; // 이전 마우스 위치 (속도 계산용)
-    let lastAmbient = 0; // 마지막 주변 파티클 생성 시각
-    let skipMove = false; // mousemove 이벤트 절반만 처리 (성능 최적화)
+    let lastX = -1, lastY = -1;
+    let lastAmbient = 0;
+    let skipMove = false;
     let animId;
 
-    // 이 캔버스 위에서만 기본 커서 숨기기
     canvas.style.cursor = 'none';
 
-    // 창 크기에 맞게 캔버스 크기 조정
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
@@ -64,62 +162,51 @@ function InkBg({ phase }) {
       ));
     }
 
-    // 파티클 하나 생성
-    // x, y: 생성 위치 / dirX, dirY: 이동 방향 / forceAlpha: 강제 투명도
     function makeParticle(x, y, dirX, dirY, forceAlpha) {
       const c = INK_COLORS[Math.floor(Math.random() * INK_COLORS.length)];
       const baseAngle = Math.atan2(dirY || 0, dirX || 0);
-      const angle = baseAngle + (Math.random() - 0.5) * 2.4; // 방향에서 ±약 140도 범위로 퍼짐
+      const angle = baseAngle + (Math.random() - 0.5) * 2.4;
       const speed = 0.2 + Math.random() * 0.3;
       return {
         x, y, c,
-        r: 20 + Math.random() * 35,       // 초기 반지름 (20~55px)
-        alpha: forceAlpha ?? (0.07 + Math.random() * 0.09), // 초기 투명도
-        vx: Math.cos(angle) * speed,       // X 속도
-        vy: Math.sin(angle) * speed,       // Y 속도
-        grow: 0.8 + Math.random() * 1.2,  // 매 프레임 반지름 증가량
-        fade: 0.018 + Math.random() * 0.012, // 매 프레임 투명도 감소량
+        r: 20 + Math.random() * 35,
+        alpha: forceAlpha ?? (0.07 + Math.random() * 0.09),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        grow: 0.8 + Math.random() * 1.2,
+        fade: 0.018 + Math.random() * 0.012,
       };
     }
 
-    // 파티클 하나를 캔버스에 그리기 (방사형 그라디언트)
     function drawParticle(p) {
       const a = Math.max(0, p.alpha);
       const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-      g.addColorStop(0,   `rgba(${p.c[0]},${p.c[1]},${p.c[2]},${a.toFixed(4)})`);        // 중심: 불투명
-      g.addColorStop(0.5, `rgba(${p.c[0]},${p.c[1]},${p.c[2]},${(a * 0.3).toFixed(4)})`); // 중간: 30%
-      g.addColorStop(1,   `rgba(${p.c[0]},${p.c[1]},${p.c[2]},0)`);                       // 가장자리: 투명
+      g.addColorStop(0,   `rgba(${p.c[0]},${p.c[1]},${p.c[2]},${a.toFixed(4)})`);
+      g.addColorStop(0.5, `rgba(${p.c[0]},${p.c[1]},${p.c[2]},${(a * 0.3).toFixed(4)})`);
+      g.addColorStop(1,   `rgba(${p.c[0]},${p.c[1]},${p.c[2]},0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // 커서 dot 요소를 한 번만 가져옴 (매번 DOM 탐색 방지)
     const dotEl = document.getElementById('cursor-dot');
 
     function onMouseMove(e) {
-      // 매 이벤트마다 처리하지 않고 하나씩 건너뜀 (성능 최적화)
       skipMove = !skipMove;
       if (skipMove) return;
-
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       lastX = e.clientX;
       lastY = e.clientY;
-      const speed = Math.hypot(dx, dy); // 마우스 이동 속도
-
-      // 커서 dot 위치 업데이트
+      const speed = Math.hypot(dx, dy);
       if (dotEl) {
         dotEl.style.left = e.clientX + 'px';
         dotEl.style.top = e.clientY + 'px';
         dotEl.style.opacity = '1';
       }
-
       if (speed > 1.5) {
-        // 속도에 비례해서 파티클 생성 (최대 3개)
         const count = Math.min(Math.floor(1 + speed * 0.2), 3);
-        // 파티클이 80개 넘으면 오래된 것부터 제거
         if (particles.length > 80) particles.splice(0, particles.length - 80);
         for (let i = 0; i < count; i++) particles.push(makeParticle(e.clientX, e.clientY, dx, dy));
       }
@@ -128,9 +215,7 @@ function InkBg({ phase }) {
 
     function onClick(e) {
       ripples.push({
-        x: e.clientX,
-        y: e.clientY,
-        r: 0,
+        x: e.clientX, y: e.clientY, r: 0,
         maxR: Math.max(window.innerWidth, window.innerHeight) * 0.8,
         alpha: 0.18,
         color: RIPPLE_COLORS[Math.floor(Math.random() * RIPPLE_COLORS.length)],
@@ -139,16 +224,12 @@ function InkBg({ phase }) {
     }
     window.addEventListener('click', onClick);
 
-    // 메인 애니메이션 루프
     function loop(timestamp) {
       const W = canvas.width;
       const H = canvas.height;
-
-      // 매 프레임 배경을 반투명 검정으로 덮어서 잔상 효과 생성
       ctx.fillStyle = 'rgba(14,11,20,0.12)';
       ctx.fillRect(0, 0, W, H);
 
-      // 리플 — 파티클보다 먼저 그려서 파티클이 위에 표시됨
       for (let i = ripples.length - 1; i >= 0; i--) {
         const rip = ripples[i];
         ctx.save();
@@ -178,23 +259,20 @@ function InkBg({ phase }) {
         lastAmbient = timestamp;
       }
 
-      // 파티클 뒤에서부터 순회 (splice 사용 시 인덱스 안전)
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         drawParticle(p);
-        p.x += p.vx; p.y += p.vy;   // 위치 이동
-        p.vx *= 0.98; p.vy *= 0.98; // 마찰로 속도 감소
-        p.r += p.grow;               // 반지름 증가 (번지는 효과)
-        p.alpha -= p.fade;           // 투명도 감소 (사라지는 효과)
-        if (p.alpha <= 0) particles.splice(i, 1); // 완전히 사라지면 제거
+        p.x += p.vx; p.y += p.vy;
+        p.vx *= 0.98; p.vy *= 0.98;
+        p.r += p.grow;
+        p.alpha -= p.fade;
+        if (p.alpha <= 0) particles.splice(i, 1);
       }
 
       animId = requestAnimationFrame(loop);
     }
 
     animId = requestAnimationFrame(loop);
-
-    // 컴포넌트 언마운트 시 정리
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener('mousemove', onMouseMove);
@@ -206,11 +284,9 @@ function InkBg({ phase }) {
   return <canvas id="ink-bg" ref={canvasRef} />;
 }
 
-// ─── 스캔 캔버스 (분석 중 이미지 위에 표시) ────────────────────────────────────
+// ─── ScanCanvas (분석 중 이미지 위에 표시) ──────────────────────────────────────
 
-// active가 true일 때만 애니메이션 실행
-// analyzeImage가 완료되면 phase가 'done'으로 바뀌고 active=false → 자동 정지
-function ScanCanvas({ active }) {
+function ScanCanvas({ active, size = 240 }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -219,30 +295,23 @@ function ScanCanvas({ active }) {
     const ctx = canvas.getContext('2d');
     const W = canvas.width;
     const H = canvas.height;
-    const cycleDuration = 2800; // 스캔라인 한 번 내려가는 시간 (ms)
+    const cycleDuration = 2800;
     const start = performance.now();
     let animId;
 
     function loop(now) {
-      // 전체 높이에서 현재 스캔 위치 계산 (반복 사이클)
       const progress = ((now - start) % cycleDuration) / cycleDuration;
       ctx.clearRect(0, 0, W, H);
-
       const scanY = progress * H;
-
-      // 스캔된 영역에 보라빛 오버레이
       ctx.fillStyle = `rgba(180,150,255,${(progress * 0.09).toFixed(4)})`;
       ctx.fillRect(0, 0, W, scanY);
-
-      // 스캔라인 (밝은 수평선)
       const lineH = 20;
       const grad = ctx.createLinearGradient(0, scanY - lineH, 0, scanY + lineH);
       grad.addColorStop(0,   'rgba(217,207,234,0)');
-      grad.addColorStop(0.5, 'rgba(217,207,234,0.28)'); // 중앙이 가장 밝음
+      grad.addColorStop(0.5, 'rgba(217,207,234,0.28)');
       grad.addColorStop(1,   'rgba(217,207,234,0)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, scanY - lineH, W, lineH * 2);
-
       animId = requestAnimationFrame(loop);
     }
 
@@ -254,62 +323,44 @@ function ScanCanvas({ active }) {
     <canvas
       ref={ref}
       className="scan-overlay"
-      width={320}
-      height={320}
-      style={{ width: '320px', height: '320px' }}
+      width={size}
+      height={size}
+      style={{ width: `${size}px`, height: `${size}px` }}
     />
   );
 }
 
-// ─── 분석 카드 컴포넌트 ──────────────────────────────────────────────────────
-
-// visible이 true가 되면 슬라이드인 애니메이션 실행
-function AnalysisCard({ title, visible, style, children }) {
-  return (
-    <div
-      className={`analysis-card${visible ? ' analysis-card--in' : ''}`}
-      style={{
-        position: 'absolute',
-        width: '180px',
-        minWidth: 'unset',
-        padding: '12px 16px',
-        borderRadius: '12px',
-        background: 'rgba(238,235,248,0.75)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        ...style,
-      }}
-    >
-      <p className="card-title" style={{ fontSize: '13px', fontWeight: 600 }}>{title}</p>
-      {children}
-    </div>
-  );
-}
-
-// ─── 홀로그래픽 배경 (idle 전용) ─────────────────────────────────────────────
-
 // ─── 메인 앱 ─────────────────────────────────────────────────────────────────
 
 export default function App() {
-  // 현재 화면 단계: idle → uploaded → scanning → done
-  const [phase, setPhase] = useState('idle');
-  const [imageUrl, setImageUrl] = useState(null);   // 업로드된 이미지 URL
-  const [fileName, setFileName] = useState('');     // 파일 이름 (표시용)
-  const [rules, setRules] = useState(null);         // imageAnalysis 결과
-  const [cardData, setCardData] = useState(null);   // 분석 카드 표시 데이터
-  const [activeStage, setActiveStage] = useState(0); // 하단 단계 표시 (0~4)
-  const [statusText, setStatusText] = useState('awaiting memory fragment'); // 우상단 상태 텍스트
-  const [cardsIn, setCardsIn] = useState([false, false, false, false]); // 분석 카드 표시 여부
-  const [extracting, setExtracting] = useState(false); // extracted 카드 fly-in 트리거
+  // phase: 'browse' | 'selected' | 'feeling' | 'analyzing' | 'generating' | 'projecting' | 'archive'
+  const [phase, setPhase] = useState('browse');
+  const [archiveImages, setArchiveImages] = useState([]);
+  const [selectedIdx, setSelectedIdx] = useState(null);
+  const [rules, setRules] = useState(null);
+  const [analyzePercent, setAnalyzePercent] = useState(0);
+  const [activeStage, setActiveStage] = useState(0);
+  const [statusText, setStatusText] = useState('ZONE 02 — 색의 잔상');
   const [archiveItems, setArchiveItems] = useState([]);
+  const [saved, setSaved] = useState(false);
+  const [browseStartTime, setBrowseStartTime] = useState(null);
+  const [projectionTimestamp, setProjectionTimestamp] = useState('');
+  const [sessionDuration, setSessionDuration] = useState(0);
+  const [selectedKeywords, setSelectedKeywords] = useState([]);
 
-  const fileInputRef = useRef(null);        // 숨겨진 파일 input
-  const lightBgCanvasRef = useRef(null);    // done 화면의 풀스크린 빛 그래픽 캔버스
-  const miniCanvasRef = useRef(null);       // done 화면의 AFTER 미니 캔버스
-  const coordsRef = useRef(null);           // 하단 좌표 표시 (DOM 직접 업데이트)
-  const genRunRef = useRef(0);             // 중복 생성 방지용 실행 ID
+  const lightBgCanvasRef = useRef(null);
+  const coordsRef = useRef(null);
+  const genRunRef = useRef(0);
+  const percentIntervalRef = useRef(null);
 
-  // 마우스 좌표를 하단에 표시 (React state 쓰지 않고 DOM 직접 업데이트 → 리렌더링 없음)
+  // 마운트 시: 실제 사진이 있으면 우선 사용, 없으면 절차적 이미지 fallback
+  useEffect(() => {
+    const real = buildRealPhotoList();
+    setArchiveImages(real.length > 0 ? real : generateArchiveImages());
+    setBrowseStartTime(Date.now());
+  }, []);
+
+  // 마우스 좌표 표시 (DOM 직접 업데이트)
   useEffect(() => {
     function onMove(e) {
       if (!coordsRef.current) return;
@@ -321,597 +372,466 @@ export default function App() {
     return () => document.removeEventListener('mousemove', onMove);
   }, []);
 
-  // extracted 단계: 카드 fly-in 애니메이션 트리거
+  // projecting 진입 시 빛 그래픽 렌더링
   useEffect(() => {
-    if (phase !== 'extracted') return;
-    setExtracting(false);
-    const t = setTimeout(() => setExtracting(true), 50);
-    return () => clearTimeout(t);
-  }, [phase]);
-
-  // phase가 'done'이 되면 풀스크린 캔버스에 빛 그래픽 렌더링
-  // 렌더링 후 미니 캔버스(AFTER)에도 복사
-  useEffect(() => {
-    if (phase !== 'done' || !rules) return;
+    if (phase !== 'projecting' || !rules) return;
+    setSaved(false);
     const timeout = setTimeout(() => {
       try {
         if (lightBgCanvasRef.current) {
           renderLightGraphic(lightBgCanvasRef.current, rules, 1);
-          if (miniCanvasRef.current) {
-            const miniCtx = miniCanvasRef.current.getContext('2d');
-            miniCtx.clearRect(0, 0, 1000, 1000);
-            miniCtx.drawImage(lightBgCanvasRef.current, 0, 0); // 풀스크린 캔버스를 미니에 복사
-          }
         }
       } catch (e) { console.error(e); }
-    }, 100); // 캔버스가 DOM에 마운트된 후 실행되도록 100ms 지연
+    }, 100);
     return () => clearTimeout(timeout);
   }, [phase, rules]);
 
-  // 파일 선택 시 처리
-  function onFileChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = ''; // 같은 파일 재선택 가능하도록 초기화
-    const url = URL.createObjectURL(file);
-    setImageUrl(prev => { if (prev) URL.revokeObjectURL(prev); return url; }); // 이전 URL 메모리 해제
-    setFileName(file.name);
-    setRules(null);
-    setCardData(null);
-    setCardsIn([false, false, false, false]);
-    setActiveStage(0);
-    setStatusText('memory fragment loaded');
-    setPhase('uploaded');
+  const selectedImage = selectedIdx !== null ? archiveImages[selectedIdx] : null;
+
+  // 이미지 선택
+  function selectImage(idx) {
+    setSelectedIdx(idx);
+    setPhase('selected');
+    setActiveStage(1);
   }
 
-  // Generate 버튼 클릭 시 분석 시작
-  async function startGenerate() {
-    if (!imageUrl) return;
-    const runId = ++genRunRef.current; // 새 실행 ID (이전 실행 무효화)
-    setPhase('scanning');
-    setActiveStage(1);
-    setCardsIn([false, false, false, false]);
-    setStatusText('reading sensory elements...');
+  // 키워드 선택 단계로
+  function goToFeeling() {
+    setSelectedKeywords([]);
+    setPhase('feeling');
+    setActiveStage(2);
+    setStatusText('ZONE 02 — 색의 잔상');
+  }
 
-    // 카드 애니메이션 스케줄 (분석 완료와 무관하게 독립 실행)
-    const schedule = [
-      { delay: 700,  msg: 'extracting color palette...',  stage: 1 },
-      { delay: 1500, msg: 'measuring blur density...',     stage: 2 },
-      { delay: 2300, msg: 'locating light origin...',      stage: 2 },
-      { delay: 3100, msg: 'tracing motion direction...',   stage: 3 },
-    ];
-    schedule.forEach(({ delay, msg, stage }, i) => {
-      setTimeout(() => {
-        if (genRunRef.current !== runId) return; // 다른 실행이 시작됐으면 무시
-        setCardsIn(prev => { const n = [...prev]; n[i] = true; return n; });
-        setStatusText(msg);
-        setActiveStage(stage);
-      }, delay);
+  // 키워드 토글 (최대 2개)
+  function toggleKeyword(ko) {
+    setSelectedKeywords(prev => {
+      if (prev.includes(ko)) return prev.filter(k => k !== ko);
+      if (prev.length >= 2) return [...prev.slice(1), ko];
+      return [...prev, ko];
     });
+  }
+
+  // 분석 시작
+  async function startAnalysis() {
+    if (!selectedImage) return;
+    const runId = ++genRunRef.current;
+    setPhase('analyzing');
+    setActiveStage(3);
+    setAnalyzePercent(0);
+    setStatusText(`ANALYZING — ${selectedImage.id}`);
+
+    const totalDuration = 5200;
+    const startTime = Date.now();
+
+    if (percentIntervalRef.current) clearInterval(percentIntervalRef.current);
+    percentIntervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const pct = Math.min(Math.round((elapsed / totalDuration) * 100), 99);
+      setAnalyzePercent(pct);
+      if (pct >= 99) clearInterval(percentIntervalRef.current);
+    }, 80);
+
+    const FALLBACK_ANALYSIS = {
+      palette: ['#c8b89a', '#8a9aac', '#4a4a56', '#d4c8b8'],
+      paletteWeights: [0.35, 0.28, 0.22, 0.15],
+      lightOrigin: { x: 0.5, y: 0.38 },
+      brightRegions: [{ x: 0.5, y: 0.38, brightness: 0.7, size: 0.12, strength: 0.6, color: '#c8b89a' }],
+      structureAnchors: [],
+      averageBrightness: 0.42,
+      blurDensity: 0.65,
+      motionDirection: { angle: 0, label: 'horizontal drift' },
+      structure: { compositionType: 'abstract / unclear', dominantAxis: 'balanced / scattered', shapeEnergy: 'wave-like', spatialWeight: 'centered', balance: { x: 0.5, y: 0.5 }, concentration: 0.4, distribution: 0.5, geometricRhythm: 0.3, diagonalDominance: 0.3, horizontalDominance: 0.5, radialDominance: 0.3, repetition: 0.2, verticalDominance: 0.5 },
+    };
 
     try {
-      // 분석 완료 AND 최소 4500ms 경과, 둘 다 충족해야 다음으로 진행
-      // → 카드 애니메이션이 항상 끝까지 보임
-      const [analysis] = await Promise.all([
-        analyzeImage(imageUrl),
-        new Promise(resolve => setTimeout(resolve, 4500)),
-      ]);
+      let analysis;
+      try {
+        [analysis] = await Promise.all([
+          analyzeImage(selectedImage.dataUrl),
+          new Promise(r => setTimeout(r, totalDuration)),
+        ]);
+      } catch (imgErr) {
+        console.warn('analyzeImage failed, using fallback:', imgErr);
+        await new Promise(r => setTimeout(r, totalDuration));
+        analysis = FALLBACK_ANALYSIS;
+      }
 
       if (genRunRef.current !== runId) return;
-      setRules(analysis);
-      setCardData(analysis);
-      setActiveStage(3);
-      setStatusText('light record ready');
+      clearInterval(percentIntervalRef.current);
+      setAnalyzePercent(100);
+      setRules({ ...analysis, emotionKeywords: selectedKeywords });
 
-      // 400ms 추가 여유 후 결과 화면으로 전환
+      // generating 단계로 전환
       setTimeout(() => {
-        if (genRunRef.current === runId) setPhase('extracted');
-      }, 2000);
+        if (genRunRef.current !== runId) return;
+        setPhase('generating');
+        setActiveStage(4);
+        setAnalyzePercent(0);
+        setStatusText(`GENERATING — ${selectedImage.id}`);
+
+        const genStart = Date.now();
+        const genDuration = 2500;
+        const genInterval = setInterval(() => {
+          const elapsed = Date.now() - genStart;
+          const pct = Math.min(Math.round((elapsed / genDuration) * 100), 99);
+          setAnalyzePercent(pct);
+          if (pct >= 99) clearInterval(genInterval);
+        }, 80);
+
+        setTimeout(() => {
+          if (genRunRef.current !== runId) return;
+          clearInterval(genInterval);
+          setAnalyzePercent(100);
+
+          const now = new Date();
+          const ts = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          const dur = Math.round((Date.now() - (browseStartTime || Date.now())) / 1000);
+
+          setProjectionTimestamp(ts);
+          setSessionDuration(dur);
+          setStatusText(`RECORD SAVED — ${ts}`);
+          setActiveStage(5);
+
+          setTimeout(() => {
+            if (genRunRef.current === runId) setPhase('projecting');
+          }, 400);
+        }, genDuration);
+      }, 600);
+
     } catch (err) {
       console.error(err);
       if (genRunRef.current === runId) {
-        setStatusText('analysis failed');
-        setPhase('uploaded');
+        clearInterval(percentIntervalRef.current);
+        setStatusText('ZONE 02 — 색의 잔상');
+        setPhase('feeling');
       }
-    }
-  }
-
-  function saveWithEviction(entry, items) {
-    try {
-      const updated = [entry, ...items].slice(0, 30);
-      localStorage.setItem('libeo-archive', JSON.stringify(updated));
-      return true;
-    } catch (e) {
-      if (items.length > 5) {
-        return saveWithEviction(entry, items.slice(0, -5));
-      }
-      return false;
     }
   }
 
   function saveToArchive() {
     const canvas = lightBgCanvasRef.current;
     if (!canvas) return;
-
     const offscreen = document.createElement('canvas');
     offscreen.width = 500;
     offscreen.height = 500;
     const offCtx = offscreen.getContext('2d');
     offCtx.drawImage(canvas, 0, 0, 500, 500);
     const dataUrl = offscreen.toDataURL('image/jpeg', 0.6);
-
     const existing = JSON.parse(localStorage.getItem('libeo-archive') || '[]');
-
     const entry = {
       id: Date.now(),
       dataUrl,
       createdAt: new Date().toISOString(),
+      emotion: selectedKeywords,
+      palette: rules?.palette?.slice(0, 3) ?? [],
+      brightness: rules ? Math.round(rules.averageBrightness * 100) : null,
+      blur: rules ? Math.round(rules.blurDensity * 100) : null,
+      spread: rules ? Math.round((rules.structure?.distribution ?? 0) * 100) : null,
     };
-
-    saveWithEviction(entry, existing);
-    setActiveStage(4);
-    setStatusText('saved to archive');
+    try {
+      const updated = [entry, ...existing].slice(0, 30);
+      localStorage.setItem('libeo-archive', JSON.stringify(updated));
+    } catch (e) { console.error(e); }
+    setSaved(true);
   }
 
-  function goBack() {
-    setPhase('idle');
+  function deleteArchiveItem(id) {
+    const updated = archiveItems.filter(item => item.id !== id);
+    setArchiveItems(updated);
+    try {
+      localStorage.setItem('libeo-archive', JSON.stringify(updated));
+    } catch (e) { console.error(e); }
   }
 
-  function generateVariation() {
-    if (!rules || !lightBgCanvasRef.current) return;
-    const nextVariation = Math.floor(Math.random() * 10) + 1;
-    renderLightGraphic(lightBgCanvasRef.current, rules, nextVariation);
-    if (miniCanvasRef.current) {
-      const miniCtx = miniCanvasRef.current.getContext('2d');
-      miniCtx.clearRect(0, 0, 1000, 1000);
-      miniCtx.drawImage(lightBgCanvasRef.current, 0, 0);
-    }
+  function goToBrowse() {
+    setPhase('browse');
+    setSelectedIdx(null);
+    setActiveStage(0);
+    setStatusText('ZONE 02 — 색의 잔상');
+    setBrowseStartTime(Date.now());
+    setSelectedKeywords([]);
   }
 
-  const vis = p => phase === p; // 현재 phase와 일치하면 true
+  const vis = p => phase === p;
+  const isBrowsing = phase === 'browse' || phase === 'selected';
+  const isFeeling = phase === 'feeling';
+  const isAnalyzing = phase === 'analyzing' || phase === 'generating';
 
   return (
     <>
-      {/* 커서 dot — 마우스 위치에 따라 InkBg에서 직접 위치 업데이트 */}
-      <div
-        id="cursor-dot"
-        style={{
-          position: 'fixed',
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          background: 'rgba(255,255,255,0.75)',
-          pointerEvents: 'none',
-          zIndex: 9999,
-          opacity: 0,
-          transform: 'translate(-50%, -50%)',
-          transition: 'opacity 200ms',
-        }}
-      />
+      {/* 커서 dot */}
+      <div id="cursor-dot" className="cursor-dot" />
 
-      {/* 잉크 인터랙션 배경 캔버스 (항상 렌더링) */}
-      <InkBg phase={phase} />
-
-      {/* 숨겨진 파일 input — idle 화면 클릭 시 열림 */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        className="hidden-file"
-        onChange={onFileChange}
-      />
+      {/* 잉크 인터랙션 배경 */}
+      <InkBg />
 
       {/* 상단 네비게이션 */}
       <nav className="top-nav">
-        <a className="wordmark-link" href="/" aria-label="libeo home">
-          <img src={wordmark} alt="LIBEO" className="wordmark-img" />
-        </a>
+        <button className="wordmark-link" onClick={goToBrowse} aria-label="home">
+          <span className="wordmark-text">UNANSWERED</span>
+        </button>
         <span className="nav-status">{statusText}</span>
         <button
+          className="archive-nav-btn"
           onClick={() => {
             const items = JSON.parse(localStorage.getItem('libeo-archive') || '[]');
             setArchiveItems(items);
             setPhase('archive');
-          }}
-          style={{
-            background: 'none',
-            border: '0.5px solid rgba(255,255,255,0.2)',
-            borderRadius: '999px',
-            padding: '6px 16px',
-            fontSize: '11px',
-            color: 'rgba(255,255,255,0.5)',
-            letterSpacing: '0.08em',
-            cursor: 'none',
-            fontFamily: 'inherit',
           }}
         >
           archive
         </button>
       </nav>
 
-      {/* ── Phase 1: 대기 화면 ── */}
-      <div
-        className={`phase-screen${vis('idle') ? ' phase-in' : ''}`}
-        onClick={() => vis('idle') && fileInputRef.current?.click()}
-        role="button"
-        tabIndex={vis('idle') ? 0 : -1}
-        aria-label="Click to upload image"
-      >
-        <div className="idle-content">
-          <h1 style={{
-            fontSize: 'clamp(48px, 9vw, 72px)',
-            fontWeight: 200,
-            color: 'rgba(255,255,255,0.88)',
-            letterSpacing: '-0.01em',
-            lineHeight: 0.96,
-            textAlign: 'center',
-            textShadow: '0 0 80px rgba(200,180,255,0.3), 0 0 160px rgba(180,150,255,0.15)',
-          }}>Light Translation<br/>System</h1>
-          <p style={{
-            fontSize: '13px',
-            color: 'rgba(255,255,255,0.25)',
-            marginTop: '40px',
-            letterSpacing: '0.08em',
-            textAlign: 'center',
-          }}>blurred memory fragments → personal light graphics</p>
-          <p style={{
-            fontSize: '13px',
-            color: 'rgba(221, 192, 255, 0.53)',
-            marginTop: '48px',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            animation: 'gentlePulse 3s ease-in-out infinite',
-          }}>click anywhere to begin</p>
+      {/* ── STEP 01 + 02: 아카이브 탐색 / 이미지 선택 ── */}
+      <div className={`phase-screen browse-screen${isBrowsing ? ' phase-in' : ''}`}>
+        <p className="browse-hint">단서처럼 느껴지는 이미지를 선택하세요</p>
+        <div className="archive-grid">
+          {archiveImages.map((img, idx) => (
+            <button
+              key={img.id}
+              className={`archive-cell${selectedIdx === idx ? ' archive-cell--selected' : ''}${selectedIdx !== null && selectedIdx !== idx ? ' archive-cell--dimmed' : ''}`}
+              onClick={() => selectImage(idx)}
+              aria-label={img.id}
+            >
+              <img src={img.src} alt={img.id} className="archive-cell-img" />
+              <div className="archive-cell-caption">
+                <span className="archive-cell-num">{img.id.replace('IMAGE_', '')}</span>
+                {img.label && <span className="archive-cell-title">{img.label}</span>}
+              </div>
+            </button>
+          ))}
         </div>
+        {vis('selected') && (
+          <button className="pill-btn analyze-start-btn" onClick={goToFeeling}>
+            이 사진 선택하기 →
+          </button>
+        )}
       </div>
 
-      {/* ── Shared image container — identical position in uploaded + scanning ── */}
-      {imageUrl && (vis('uploaded') || vis('scanning')) && (
-        <div style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 11,
-          width: '320px',
-          height: '320px',
-        }}>
-          <img
-            src={imageUrl}
-            className="preview-portrait"
-            alt="memory fragment"
-            style={{ width: '320px', height: '320px', objectFit: 'cover', borderRadius: '18px', display: 'block' }}
-          />
-          {/* Scan overlay + cards — only visible during scanning */}
-          {vis('scanning') && <ScanCanvas active={true} />}
+      {/* ── STEP 03: 감정 키워드 선택 ── */}
+      <div className={`phase-screen feeling-screen${isFeeling ? ' phase-in' : ''}`}>
+        {selectedImage && (
+          <div className="feeling-layout">
+            <div className="feeling-image-wrap">
+              <img src={selectedImage.src} alt="selected" className="feeling-preview-img" />
+              <p className="feeling-img-label">{selectedImage.label}</p>
+            </div>
+            <div className="feeling-right">
+              <p className="feeling-title">이 사진에서 어떤 감정이 느껴지나요?</p>
+              <p className="feeling-subtitle">최대 2개까지 선택할 수 있어요</p>
+              <div className="keyword-grid">
+                {EMOTION_KEYWORDS.map(kw => (
+                  <button
+                    key={kw.id}
+                    className={`keyword-chip${selectedKeywords.includes(kw.ko) ? ' keyword-chip--selected' : ''}`}
+                    onClick={() => toggleKeyword(kw.ko)}
+                  >
+                    <span className="keyword-chip-ko">{kw.ko}</span>
+                    <span className="keyword-chip-en">{kw.en}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                className="pill-btn feeling-next-btn"
+                onClick={startAnalysis}
+                disabled={selectedKeywords.length === 0}
+              >
+                {selectedKeywords.length === 0 ? '감정을 선택하세요' : `빛 생성 시작 — ${selectedKeywords.join(' · ')} →`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
-          {vis('scanning') && (
-            <>
-              <AnalysisCard title="Color" visible={cardsIn[0]} style={{ top: '60px', left: '-80px', transform: 'rotate(-2deg)' }}>
-                <div className="card-palette-row" key={cardData ? 'real' : 'placeholder'}>
-                  {cardData?.palette
-                    ? cardData.palette.map((hex, i) => <span key={i} className="card-dot" style={{ background: hex }} />)
-                    : [0, 1, 2, 3, 4].map(i => <span key={i} className="card-dot" />)}
-                </div>
-                <p className="card-sub" style={{ fontSize: '11px' }}>dominant palette</p>
-              </AnalysisCard>
+      {/* ── STEP 04 + 05: 분석 / 생성 프로세스 ── */}
+      <div className={`phase-screen${isAnalyzing ? ' phase-in' : ''}`}>
+        {selectedImage && (
+          <div className="analysis-layout">
+            {/* 왼쪽: 선택 이미지 + 스캔 오버레이 */}
+            <div className="analysis-image-wrap">
+              <img src={selectedImage.src} alt="selected" className="analysis-img" />
+              <ScanCanvas active={isAnalyzing} size={240} />
+            </div>
 
-              <AnalysisCard title="Blur Density" visible={cardsIn[1]} style={{ bottom: '-30px', left: '55%', transform: 'rotate(1.5deg)' }}>
-                <div className="card-bar-track">
+            {/* 오른쪽: 분석 패널 */}
+            <div className="analysis-panel">
+              <p className="analysis-panel-title">
+                {phase === 'generating' ? 'GENERATING LIGHT GRAPHIC...' : 'ANALYZING IMAGE...'}
+              </p>
+              <div className="analysis-rows" key={phase}>
+                {ANALYSIS_ROWS.map((row) => (
+                  <div key={row.label} className="analysis-row">
+                    <span className="analysis-row-label">{row.label}</span>
+                    <div className="analysis-bar-track">
+                      <div
+                        className={`analysis-bar-fill analysis-bar-fill--${phase}`}
+                        style={{
+                          animationDelay: `${phase === 'generating'
+                            ? Math.round(row.delay * 0.22)
+                            : row.delay}ms`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="analysis-percent-row">
+                <span className="analysis-percent-num">{analyzePercent}%</span>
+                <div className="analysis-percent-bar-track">
                   <div
-                    key={cardData ? 'real' : 'placeholder'}
-                    className={`card-bar-fill${cardsIn[1] ? ' card-bar-fill--go' : ''}`}
-                    style={cardData ? { width: `${Math.round(cardData.blurDensity * 100)}%` } : undefined}
+                    className="analysis-percent-bar-fill"
+                    style={{ width: `${analyzePercent}%` }}
                   />
                 </div>
-                <p className="card-value" key={cardData ? 'real' : 'placeholder'}>{cardData ? Math.round(cardData.blurDensity * 100) + '%' : '—'}</p>
-                <p className="card-sub" style={{ fontSize: '11px' }}>soft diffusion</p>
-              </AnalysisCard>
-
-              <AnalysisCard title="Light Origin" visible={cardsIn[2]} style={{ top: '-20px', right: '60px', transform: 'rotate(2deg)' }}>
-                <p className="card-value" key={cardData ? 'real' : 'placeholder'}>
-                  {cardData
-                    ? `${Math.round(cardData.lightOrigin.x * 100)} / ${Math.round(cardData.lightOrigin.y * 100)}`
-                    : 'locating...'}
-                </p>
-                <p className="card-sub" style={{ fontSize: '11px' }}>brightest region</p>
-              </AnalysisCard>
-
-              <AnalysisCard title="Motion Trace" visible={cardsIn[3]} style={{ top: '45%', right: '-90px', transform: 'rotate(-1deg)' }}>
-                <p className="card-value" key={cardData ? 'real' : 'placeholder'}>{cardData?.motionDirection?.label || 'tracing...'}</p>
-                <p className="card-sub" style={{ fontSize: '11px' }}>directional drift</p>
-              </AnalysisCard>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* ── Phase 2: 업로드 완료 — button only ── */}
-      <div className={`phase-screen${vis('uploaded') ? ' phase-in' : ''}`}>
-        <button
-          onClick={startGenerate}
-          style={{
-            position: 'fixed',
-            bottom: '140px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            padding: '16px 32px',
-            borderRadius: '999px',
-            border: '1px solid rgba(217,207,234,0.32)',
-            background: 'rgba(217,207,234,0.09)',
-            fontSize: '14px',
-            color: 'rgba(217,207,234,0.88)',
-            fontFamily: 'inherit',
-            cursor: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Generate Light Graphic
-        </button>
-      </div>
-
-      {/* ── Phase 3: 스캔 & 분석 — no content here, handled in shared container ── */}
-      <div className={`phase-screen${vis('scanning') ? ' phase-in' : ''}`} />
-
-      {/* ── Phase: extracted — 추출 요약 화면 (3초 후 done으로 자동 전환) ── */}
-      <div
-        className={`phase-screen${vis('extracted') ? ' phase-in' : ''}`}
-        style={{ position: 'fixed', inset: 0, zIndex: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
-      >
-        <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '40px' }}>
-          extraction complete
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          {/* Card 1 — Color Palette */}
-          <div className={`extracted-card${extracting ? ' in' : ''}`} style={{ minWidth: '160px', padding: '24px', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '16px', transitionDelay: '0ms' }}>
-            <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.35)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>Color Palette</p>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              {(rules?.palette || []).map((hex, i) => (
-                <span key={i} style={{ width: '28px', height: '28px', borderRadius: '50%', background: hex, display: 'inline-block' }} />
-              ))}
+              </div>
             </div>
           </div>
-
-          {/* Card 2 — Blur Density */}
-          <div className={`extracted-card${extracting ? ' in' : ''}`} style={{ minWidth: '160px', padding: '24px', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '16px', transitionDelay: '120ms' }}>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>Blur Density</p>
-            <p style={{ fontSize: '32px', fontWeight: 200, color: 'rgba(255,255,255,0.85)', lineHeight: 1, marginBottom: '12px' }}>
-              {rules ? Math.round(rules.blurDensity * 100) + '%' : '—'}
-            </p>
-            <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px' }}>
-              <div style={{ height: '100%', width: rules ? `${Math.round(rules.blurDensity * 100)}%` : '0%', background: 'rgba(255,255,255,0.5)', borderRadius: '2px', transition: 'width 800ms ease' }} />
-            </div>
-          </div>
-
-          {/* Card 3 — Light Origin */}
-          <div className={`extracted-card${extracting ? ' in' : ''}`} style={{ minWidth: '160px', padding: '24px', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '16px', transitionDelay: '240ms' }}>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>Light Origin</p>
-            <p style={{ fontSize: '32px', fontWeight: 200, color: 'rgba(255,255,255,0.85)', lineHeight: 1 }}>
-              {rules ? `${Math.round(rules.lightOrigin.x * 100)} / ${Math.round(rules.lightOrigin.y * 100)}` : '—'}
-            </p>
-          </div>
-
-          {/* Card 4 — Motion Trace */}
-          <div className={`extracted-card${extracting ? ' in' : ''}`} style={{ minWidth: '160px', padding: '24px', background: 'rgba(255,255,255,0.05)', border: '0.5px solid rgba(255,255,255,0.1)', borderRadius: '16px', transitionDelay: '360ms' }}>
-            <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>Motion Trace</p>
-            <p style={{ fontSize: '24px', fontWeight: 200, color: 'rgba(255,255,255,0.85)', marginBottom: '8px' }}>
-              {rules?.motionDirection?.label || '—'}
-            </p>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setPhase('done')}
-          style={{
-            marginTop: '40px',
-            padding: '20px 44px',
-            borderRadius: '999px',
-            border: '1px solid rgba(217,207,234,0.3)',
-            background: 'rgba(217,207,234,0.09)',
-            fontSize: '14px',
-            color: 'rgba(217,207,234,0.88)',
-            fontFamily: 'inherit',
-            cursor: 'none',
-            letterSpacing: '0.02em',
-          }}
-        >
-          generate light graphic →
-        </button>
+        )}
       </div>
 
-      {/* 풀스크린 빛 그래픽 배경 캔버스 — done 단계에서만 보임 */}
+      {/* 풀스크린 빛 그래픽 캔버스 — projecting 단계에서만 표시 */}
       <canvas
         ref={lightBgCanvasRef}
         id="light-bg-canvas"
         width={1000}
         height={1000}
         aria-hidden="true"
-        style={{
-          position: 'fixed',
-          inset: 0,
-          width: '100vw',
-          height: '100vh',
-          zIndex: 1,
-          objectFit: 'cover',
-          display: 'block',
-          opacity: phase === 'done' ? 1 : 0,   // done일 때만 표시
-          transition: 'opacity 1200ms ease',    // 부드럽게 페이드인
-          filter: 'brightness(0.55)',            // 어둡게 해서 UI 가독성 확보
-          pointerEvents: 'none',
-        }}
+        className={`light-bg-canvas${vis('projecting') ? ' light-bg-canvas--visible' : ''}`}
       />
 
-      {/* ── Phase 4: 결과 화면 ── */}
-      <div
-        className={`phase-screen${vis('done') ? ' phase-in' : ''}`}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 6,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <p style={{
-          fontSize: '13px',
-          color: 'rgba(255,255,255,0.35)',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          marginBottom: '32px',
-        }}>
-          light translation complete
-        </p>
-
-        {/* Before → After 비교 */}
-        <div className="compare-row" style={{ gap: '20px' }}>
-          <div className="compare-card" style={{ padding: '12px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-            <span className="compare-label" style={{ fontSize: '13px' }}>BEFORE</span>
-            {imageUrl && (
-              <img
-                src={imageUrl}
-                className="compare-img"
-                alt="before"
-                style={{ width: '200px', height: '200px' }}
-              />
+      {/* ── STEP 05: 빛 그래픽 투사 + 기록 ── */}
+      <div className={`phase-screen projecting-screen${vis('projecting') ? ' phase-in' : ''}`}>
+        {rules && selectedImage && (
+          <div className="record-card">
+            <p className="record-card-title">RECORD SAVED</p>
+            <div className="record-card-row">
+              <span className="record-card-label">SELECTED IMAGE</span>
+              <img src={selectedImage.src} alt="selected" className="record-card-thumb" />
+            </div>
+            {selectedKeywords.length > 0 && (
+              <div className="record-card-row">
+                <span className="record-card-label">EMOTION</span>
+                <span className="record-card-value">{selectedKeywords.join(' · ')}</span>
+              </div>
             )}
+            <div className="record-card-row">
+              <span className="record-card-label">MAIN COLOR</span>
+              <div className="record-card-dots">
+                {(rules.palette || []).slice(0, 3).map((hex, i) => (
+                  <span key={i} className="record-card-dot" style={{ background: hex }} />
+                ))}
+              </div>
+            </div>
+            <div className="record-card-row">
+              <span className="record-card-label">BRIGHTNESS</span>
+              <span className="record-card-value">{Math.round(rules.averageBrightness * 100)}%</span>
+            </div>
+            <div className="record-card-row">
+              <span className="record-card-label">BLUR</span>
+              <span className="record-card-value">{Math.round(rules.blurDensity * 100)}%</span>
+            </div>
+            <div className="record-card-row">
+              <span className="record-card-label">SPREAD</span>
+              <span className="record-card-value">{Math.round((rules.structure?.distribution ?? 0) * 100)}%</span>
+            </div>
+            <div className="record-card-row">
+              <span className="record-card-label">DURATION</span>
+              <span className="record-card-value">{sessionDuration}s</span>
+            </div>
+            <div className="record-card-row">
+              <span className="record-card-label">TIMESTAMP</span>
+              <span className="record-card-value record-card-ts">{projectionTimestamp}</span>
+            </div>
           </div>
-
-          <span className="compare-arrow" style={{ fontSize: '18px' }}>→</span>
-
-          <div className="compare-card" style={{ padding: '12px', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}>
-            <span className="compare-label" style={{ fontSize: '13px' }}>AFTER</span>
-            {/* 풀스크린 캔버스를 복사한 미니 결과물 */}
-            <canvas
-              ref={miniCanvasRef}
-              width={1000}
-              height={1000}
-              className="compare-img"
-              aria-label="after — generated light graphic"
-              style={{ width: '200px', height: '200px' }}
-            />
-          </div>
+        )}
+        <div className="projecting-btns">
+          <button
+            className="pill-btn"
+            onClick={saveToArchive}
+            disabled={saved}
+          >
+            {saved ? 'Saved ✓' : 'Save to Archive'}
+          </button>
+          <button className="pill-btn" onClick={goToBrowse}>
+            다른 단서 탐색 →
+          </button>
         </div>
-
-        {/* 저장 버튼 */}
-        <button
-          className="pill-btn pill-btn--save"
-          onClick={saveToArchive}
-          style={{
-            marginTop: '32px',
-            padding: '16px 32px',
-            fontSize: '14px',
-            border: '1px solid rgba(255,255,255,0.25)',
-            background: 'rgba(255,255,255,0.08)',
-            color: 'rgba(255,255,255,0.75)',
-          }}
-        >
-          Save to Archive
-        </button>
-
-        <button
-          onClick={generateVariation}
-          style={{
-            marginTop: '12px',
-            padding: '16px 32px',
-            borderRadius: '999px',
-            border: '1px solid rgba(202, 202, 202, 0.52)',
-            background: 'transparent',
-            fontSize: '14px',
-            color: 'rgba(255, 255, 255, 0.63)',
-            fontFamily: 'inherit',
-            cursor: 'none',
-            letterSpacing: '0.04em',
-          }}
-        >
-          generate variation
-        </button>
       </div>
 
-      {/* ── Phase: archive ── */}
-      <div
-        className={`phase-screen${vis('archive') ? ' phase-in' : ''}`}
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 6,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          overflowY: 'auto',
-          paddingTop: '80px',
-          paddingBottom: '60px',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '40px' }}>
-          <button
-            onClick={goBack}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'rgba(255,255,255,0.4)',
-              fontSize: '13px',
-              cursor: 'none',
-              fontFamily: 'inherit',
-              letterSpacing: '0.06em',
-            }}
-          >
-            ← back
-          </button>
-          <h2 style={{
-            fontSize: '13px',
-            fontWeight: 400,
-            color: 'rgba(255,255,255,0.5)',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            margin: 0,
-          }}>
+      {/* ── Archive 뷰 ── */}
+      <div className={`phase-screen archive-phase${vis('archive') ? ' phase-in' : ''}`}>
+        <div className="archive-phase-header">
+          <button className="archive-back-btn" onClick={goToBrowse}>← back</button>
+          <h2 className="archive-phase-title">
             archive — {archiveItems.length} records
           </h2>
         </div>
-
         {archiveItems.length === 0 ? (
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.06em' }}>
-            no records yet
-          </p>
+          <p className="archive-empty">no records yet</p>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 240px)', gap: '16px' }}>
+          <div className="archive-phase-grid">
             {archiveItems.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: '0.5px solid rgba(255,255,255,0.08)',
-                  borderRadius: '12px',
-                  overflow: 'hidden',
-                }}
-              >
-                <img
-                  src={item.dataUrl}
-                  style={{ width: '240px', height: '240px', objectFit: 'cover', display: 'block' }}
-                />
-                <div style={{ padding: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.25)', letterSpacing: '0.05em' }}>
-                    {new Date(item.createdAt).toLocaleDateString('ko-KR')}
-                  </span>
+              <div key={item.id} className="archive-phase-item">
+                <img src={item.dataUrl} className="archive-phase-img" alt="" />
+
+                {/* 삭제 버튼 */}
+                <button
+                  className="archive-delete-btn"
+                  onClick={() => deleteArchiveItem(item.id)}
+                  aria-label="delete"
+                >×</button>
+
+                {/* 호버 시 분석 결과 */}
+                <div className="archive-hover-info">
+                  {item.emotion?.length > 0 && (
+                    <div className="archive-info-row">
+                      <span className="archive-info-label">감정</span>
+                      <span className="archive-info-value">{item.emotion.join(' · ')}</span>
+                    </div>
+                  )}
+                  {item.palette?.length > 0 && (
+                    <div className="archive-info-row">
+                      <span className="archive-info-label">색상</span>
+                      <span className="archive-info-dots">
+                        {item.palette.map((hex, i) => (
+                          <span key={i} className="archive-info-dot" style={{ background: hex }} />
+                        ))}
+                      </span>
+                    </div>
+                  )}
+                  {item.brightness != null && (
+                    <div className="archive-info-row">
+                      <span className="archive-info-label">밝기</span>
+                      <span className="archive-info-value">{item.brightness}%</span>
+                    </div>
+                  )}
+                  {item.blur != null && (
+                    <div className="archive-info-row">
+                      <span className="archive-info-label">블러</span>
+                      <span className="archive-info-value">{item.blur}%</span>
+                    </div>
+                  )}
+                  {item.spread != null && (
+                    <div className="archive-info-row">
+                      <span className="archive-info-label">확산</span>
+                      <span className="archive-info-value">{item.spread}%</span>
+                    </div>
+                  )}
+                  <div className="archive-info-row">
+                    <span className="archive-info-label">저장</span>
+                    <span className="archive-info-value archive-info-date">
+                      {new Date(item.createdAt).toLocaleDateString('ko-KR')}
+                    </span>
+                  </div>
                   <button
+                    className="archive-download-btn"
                     onClick={() => {
                       const link = document.createElement('a');
-                      link.download = `libeo-${item.id}.png`;
+                      link.download = `unanswered-${item.id}.jpg`;
                       link.href = item.dataUrl;
                       link.click();
-                    }}
-                    style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '0.5px solid rgba(255,255,255,0.15)',
-                      borderRadius: '999px',
-                      padding: '5px 12px',
-                      fontSize: '10px',
-                      color: 'rgba(255,255,255,0.5)',
-                      cursor: 'none',
-                      fontFamily: 'inherit',
-                      letterSpacing: '0.05em',
                     }}
                   >
                     download
@@ -923,18 +843,15 @@ export default function App() {
         )}
       </div>
 
-      {/* 하단 바 — 단계 표시 + 커서 좌표 */}
+      {/* 하단 바 */}
       <footer className="bottom-bar">
         <ol className="step-list">
           {FLOW_STEPS.map((step, i) => (
             <li key={step} className={i === activeStage ? 'step-active' : ''}>
-              <span style={{ fontSize: '11px', letterSpacing: '0.08em' }}>
-                {String(i + 1).padStart(2, '0')} {step}
-              </span>
+              <span>{String(i + 1).padStart(2, '0')} {step}</span>
             </li>
           ))}
         </ol>
-        {/* 마우스 좌표 — useEffect에서 DOM 직접 업데이트 */}
         <span className="cursor-coords" ref={coordsRef} aria-hidden="true">0000 / 0000</span>
       </footer>
     </>

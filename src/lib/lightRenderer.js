@@ -4,8 +4,10 @@ const WIDTH = 1000;
 const HEIGHT = 1000;
 const CENTER = { x: WIDTH / 2, y: HEIGHT / 2 };
 
-export function renderLightGraphic(canvas, rules, variation = 1) {
+export function renderLightGraphic(canvas, rawRules, variation = 1) {
   if (!canvas) return;
+
+  const rules = applyEmotionModifiers(rawRules);
 
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
@@ -2184,4 +2186,53 @@ function colorDistance(colorA, colorB) {
   const db = a.b - b.b;
 
   return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+// ─── Emotion modifier ──────────────────────────────────────────────────────────
+
+const EMOTION_TINTS = {
+  '그리움':  { rgb: [190, 145, 95],  brightness: 0.88, blur: 1.12 },   // warm amber
+  '설렘':    { rgb: [220, 130, 190], brightness: 1.14, blur: 0.88 },   // rose/pink
+  '고요함':  { rgb: [120, 155, 210], brightness: 0.94, blur: 1.22 },   // cool blue
+  '슬픔':    { rgb: [90,  105, 185], brightness: 0.78, blur: 1.18 },   // indigo
+  '따뜻함':  { rgb: [225, 170, 95],  brightness: 1.12, blur: 0.86 },   // orange
+  '공허함':  { rgb: [75,  80,  105], brightness: 0.68, blur: 1.28 },   // dark muted
+  '낯섦':    { rgb: [90,  195, 185], brightness: 1.02, blur: 0.84 },   // teal/cyan
+  '불안':    { rgb: [165, 95,  210], brightness: 0.84, blur: 0.82 },   // purple
+  '평온':    { rgb: [165, 182, 190], brightness: 1.0,  blur: 1.10 },   // soft grey-blue
+  '아련함':  { rgb: [185, 155, 205], brightness: 0.90, blur: 1.15 },   // lavender
+};
+
+function applyEmotionModifiers(rules) {
+  const keywords = rules.emotionKeywords;
+  if (!keywords?.length) return rules;
+
+  const active = keywords.map(k => EMOTION_TINTS[k]).filter(Boolean);
+  if (!active.length) return rules;
+
+  // Average the tint colors and multipliers across selected keywords
+  const avgRgb = active.reduce(
+    (acc, e) => [acc[0] + e.rgb[0], acc[1] + e.rgb[1], acc[2] + e.rgb[2]],
+    [0, 0, 0],
+  ).map(v => Math.round(v / active.length));
+
+  const brightnessScale = active.reduce((acc, e) => acc * e.brightness, 1) ** (1 / active.length);
+  const blurScale       = active.reduce((acc, e) => acc * e.blur,       1) ** (1 / active.length);
+
+  // Tint each palette color 35% toward the emotion color
+  const tintedPalette = (rules.palette || []).map(hex => {
+    const rgb = hexToRgb(hex);
+    return rgbToHex([
+      Math.round(rgb[0] * 0.65 + avgRgb[0] * 0.35),
+      Math.round(rgb[1] * 0.65 + avgRgb[1] * 0.35),
+      Math.round(rgb[2] * 0.65 + avgRgb[2] * 0.35),
+    ]);
+  });
+
+  return {
+    ...rules,
+    palette: tintedPalette,
+    averageBrightness: Math.min(1, Math.max(0, rules.averageBrightness * brightnessScale)),
+    blurDensity: Math.min(0.98, Math.max(0.08, rules.blurDensity * blurScale)),
+  };
 }
